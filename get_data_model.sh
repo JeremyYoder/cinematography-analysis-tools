@@ -9,16 +9,7 @@ mkdir valid
 
 echo "Downloading .pth model"
 cd models/
-wget -O shot-type-classifier.pth https://www.dropbox.com/s/f9703kbb2l82fsd/stage-3-2.pth?dl=0
-
-echo "Downloading .pkl model (for inference)"
-wget -O shot-type-classifier.pkl https://www.dropbox.com/s/ixt7oxw8j54aorq/shot-type-classifier.pkl?dl=0
-
-echo "Downloading .onnx model"
-wget -O shot-scale-classifier.onnx https://www.dropbox.com/s/o6u7jml6qik9ru5/shot-scale-classifier.onnx?dl=0
-
-echo "Downloading .mlmodel model"
-wget -O shot-scale-classifier.mlmodel https://www.dropbox.com/s/1p6g52168u7kans/shot-scale-classifier.mlmodel?dl=0
+!gsutil cp gs://classifiermodel/*.pth .
 
 ## ---- Download Data ----
 
