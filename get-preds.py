@@ -1,5 +1,10 @@
 import argparse
 
+import warnings
+
+warnings.filterwarnings('ignore', '.*default behavior*', )
+warnings.filterwarnings('ignore', '.*torch.solve*', )
+
 parser = argparse.ArgumentParser(
     description='''
     ======================================================================
