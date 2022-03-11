@@ -50,13 +50,7 @@ def save_preds(path_img, path_preds=None):
         df = pd.DataFrame(list(zip(data.classes, preds_num )), columns=['shot-type', 'prediction'])
 
         # reorder data-frame from largest to smallest shot size
-        df['shot-type'].replace({    'Extreme Wide': 'EWS',
-                                             'Long': 'LS',
-                                           'Medium': 'MS',
-                                  'Medium Close-Up': 'MCU',
-                                         'Close-Up': 'CU',
-                                 'Extreme Close-Up': 'ECU'}, inplace=True)
-        df['shot-type'] = pd.Categorical(df['shot-type'], ['EWS', 'LS', 'MS', 'MCU', 'CU', 'ECU'])
+        df['shot-type'] = pd.Categorical(df['shot-type'], ['LS', 'FS', 'MS', 'CS', 'ECS'])
         df = df.sort_values('shot-type').reset_index(drop=True)
 
         # probability --> percentage
