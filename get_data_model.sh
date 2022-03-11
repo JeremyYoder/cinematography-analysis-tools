@@ -9,7 +9,7 @@ mkdir valid
 
 echo "Downloading .pth model"
 cd models/
-!gsutil cp gs://classifiermodel/*.pth .
+gsutil cp gs://classifiermodel/*.pth .
 
 ## ---- Download Data ----
 
