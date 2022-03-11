@@ -38,6 +38,6 @@ def get_model_data(path):
     learn = cnn_learner(data, models.resnet50, metrics = [accuracy], pretrained=True)
     learn = learn.to_fp16()
 
-    learn.load(path/'models'/'shot-type-classifier');
+    learn.load(path/'models'/'50colabstage-3-2');
 
     return learn, data
