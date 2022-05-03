@@ -1,7 +1,5 @@
 <p align="justify"><h1> AI For Filmmaking </h1> </p>
 
-Code for the blog post [AI for Filmmaking](https://rsomani95.github.io/ai-film-1.html). Detect cinematic [shot types](https://rsomani95.github.io/ai-film-1.html#dataset) in images using a pre-trained `ResNet-50`.
-
 This model recognises 6 shot types:
 
 <p align="justify"><h3>1. Extreme Wide Shot</h3></p>
@@ -19,12 +17,6 @@ This model recognises 6 shot types:
 
 <p align='center'>
   <img src='README_imgs/good-will-hunting_goodwillhunting061-9c782ccc-5914-4793-b7e9-07684474e4d4.jpg_cropped.jpg' width='425'/> <img src='README_imgs/catch-me-if-you-can_3124-ac13629a-5b69-4eb5-8c9b-6e8a25686f0b.jpg_cropped.jpg' width='425'/>
-</p>
-
-<p align="justify"><h3>4. Medium Close Up </h3></p>
-
-<p align='center'>
-  <img src='README_imgs/10cloverfield023-14265eca-3172-493b-859e-2462f918e8ad.jpg_cropped.jpg' width='425'/> <img src='README_imgs/taxi-driver_53-mohawk-a156a47e-a838-4817-8a65-6e93e4a42473.png_cropped.jpg' width='425'/>
 </p>
 
 <p align="justify"><h3>5. Close Up </h3></p>
