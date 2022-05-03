@@ -2,13 +2,13 @@ This model is a sub-process of a larger integrated content analysis tool. To use
 
 This model recognises 5 shot types:
 
-<p align="justify"><h3>1. Extreme Wide Shot</h3></p>
+<p align="justify"><h3>1. Far Shot</h3></p>
 
 <p align='center'>
   <img src='README_imgs/10cloverfield003-cafe7a6c-3fea-4e44-ad6a-3cf1de4327ab.jpg_cropped.jpg' width='425'/> <img src='README_imgs/chaplin_456-50cfefb3-a1d1-4504-944f-7ca531a9eda6.jpg_cropped.jpg' width='425'/>
 </p>
 
-<p align="justify"><h3>2. Long Shot </h3></p>
+<p align="justify"><h3>2. Full Shot </h3></p>
 <p align='center'>
   <img src='README_imgs/gangs-of-new-york_3095-6f49648f-895c-45d5-9d74-3353dab7a662.jpg_cropped.jpg' width='425'/> <img src='README_imgs/google_24-best-wide-shots-images-on-pinterest-wide-angle-shot-e7c680ea-f24a-4ebf-8496-8a51e2705834.jpg_cropped.jpg' width='425'/>
 </p>
