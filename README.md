@@ -1,4 +1,4 @@
-This model is a sub-process of a larger integrated content analysis tool. To use the UX optimized Colab notebook, <a href="https://colab.research.google.com/drive/1dCTYluzia7J-E2HdGrDaBQXQyEE9GfxG?usp=sharing"> click here </a>
+This model is a sub-process of a larger integrated content analysis tool. To use the UX optimized Colab notebook, <a href="https://colab.research.google.com/drive/1dCTYluzia7J-E2HdGrDaBQXQyEE9GfxG?usp=sharing"> click here </a>.
 
 This model recognises 5 shot types:
 
