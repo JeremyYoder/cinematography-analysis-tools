@@ -1,5 +1,4 @@
 from fastai.vision import *
-from fastbook import *
 from pathlib import Path
 
 # Data Augmentations
