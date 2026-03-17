@@ -46,7 +46,7 @@ def save_preds(path_img, path_preds=None):
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
     print(files)
 
-    bdf = pd.DataFrame()
+    bdf_list = []
 
     for file in files:
         # open file
@@ -73,7 +73,7 @@ def save_preds(path_img, path_preds=None):
 
         df['shot'] = str(file)
 
-        bdf = bdf.append(df, ignore_index=True)
+        bdf_list.append(df)
 
         # save to disk
         #fname = file.rpartition('.')[0] + '_preds.csv'
@@ -82,6 +82,12 @@ def save_preds(path_img, path_preds=None):
 
         # else:
         #    df.to_csv(Path(path_img)/fname, index=False)
+
+    if bdf_list:
+        bdf = pd.concat(bdf_list, ignore_index=True)
+    else:
+        bdf = pd.DataFrame()
+
     bdfname = "preds.csv"
     if path_preds is not None:
         bdf.to_csv(Path(path_preds)/bdfname, index=False)
