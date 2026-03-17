@@ -101,7 +101,10 @@ def save_img(img, path):
 
 
 path_img = Path(path_img)
-path_hms = Path(path_hms)
+if path_hms is not None:
+    path_hms = Path(path_hms)
+else:
+    path_hms = path_img
 
 files = [f for f in os.listdir(path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
 

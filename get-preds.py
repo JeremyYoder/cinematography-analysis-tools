@@ -38,7 +38,8 @@ learn = learn.to_fp32()
 
 
 def save_preds(path_img, path_preds=None):
-    os.mkdir(path_preds) if not os.path.exists(path_preds) else None
+    if path_preds is not None:
+        os.mkdir(path_preds) if not os.path.exists(path_preds) else None
 
     os.chdir(path_img)
     files = [f for f in os.listdir(
@@ -82,7 +83,10 @@ def save_preds(path_img, path_preds=None):
         # else:
         #    df.to_csv(Path(path_img)/fname, index=False)
     bdfname = "preds.csv"
-    bdf.to_csv(Path(path_preds)/bdfname, index=False)
+    if path_preds is not None:
+        bdf.to_csv(Path(path_preds)/bdfname, index=False)
+    else:
+        bdf.to_csv(Path(path_img)/bdfname, index=False)
 
 
 save_preds(path_img, path_preds)
