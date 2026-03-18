@@ -28,18 +28,9 @@ parser.add_argument('--path_preds', type=str, default=None,
                     help="path where you'd like to store the predictions")
 args = parser.parse_args()
 
-path = args.path_base
-path_img = args.path_img
-path_preds = args.path_preds
-
-
-learn, data = get_model_data(Path(path))
-learn = learn.to_fp32()
-
-
-def save_preds(path_img, path_preds=None):
+def save_preds(learn, data, path_img, path_preds=None):
     if path_preds is not None:
-        os.mkdir(path_preds) if not os.path.exists(path_preds) else None
+        os.makedirs(path_preds, exist_ok=True)
 
     os.chdir(path_img)
     files = [f for f in os.listdir(
@@ -95,4 +86,12 @@ def save_preds(path_img, path_preds=None):
         bdf.to_csv(Path(path_img)/bdfname, index=False)
 
 
-save_preds(path_img, path_preds)
+if __name__ == '__main__':
+    path = args.path_base
+    path_img = args.path_img
+    path_preds = args.path_preds
+
+    learn, data = get_model_data(Path(path))
+    learn = learn.to_fp32()
+
+    save_preds(learn, data, path_img, path_preds)
