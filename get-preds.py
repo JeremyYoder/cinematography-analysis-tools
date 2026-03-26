@@ -32,12 +32,12 @@ path = args.path_base
 path_img = args.path_img
 path_preds = args.path_preds
 
+import os
+import pandas as pd
+from pathlib import Path
+from fastai.vision import open_image
 
-learn, data = get_model_data(Path(path))
-learn = learn.to_fp32()
-
-
-def save_preds(path_img, path_preds=None):
+def save_preds(path_img, learn, data, path_preds=None):
     if path_preds is not None:
         os.mkdir(path_preds) if not os.path.exists(path_preds) else None
 
@@ -94,5 +94,7 @@ def save_preds(path_img, path_preds=None):
     else:
         bdf.to_csv(Path(path_img)/bdfname, index=False)
 
-
-save_preds(path_img, path_preds)
+if __name__ == '__main__':
+    learn, data = get_model_data(Path(path))
+    learn = learn.to_fp32()
+    save_preds(path_img, learn, data, path_preds)
