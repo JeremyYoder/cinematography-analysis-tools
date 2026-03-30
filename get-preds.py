@@ -1,98 +1,93 @@
-from initialise import *
+import os
 import argparse
 import warnings
+import pandas as pd
+from pathlib import Path
+from initialise import *
 
-warnings.filterwarnings('ignore', '.*default behavior*', )
-warnings.filterwarnings('ignore', '.*torch.solve*', )
+def save_preds(path_img, path_preds=None, learn=None, data=None):
+    if path_img is None:
+        return
 
-parser = argparse.ArgumentParser(
-    description='''
-    ======================================================================
-             Predict shot types using a pretrained ResNet-50
-    ======================================================================
-
-     Usage
-    -------
-
-    python get-preds.py
-        --path_base '/home/user/shot-type-classifier'
-        --path_img '/home/user/Desktop/imgs'
-        --path_preds '/home/user/Desktop/imgs/preds'
-    ''', formatter_class=argparse.RawTextHelpFormatter)
-
-parser.add_argument('--path_base', type=str,
-                    help='path to the "shot-type-classifier" directory')
-parser.add_argument('--path_img', type=str,
-                    help='path to where the images are stored')
-parser.add_argument('--path_preds', type=str, default=None,
-                    help="path where you'd like to store the predictions")
-args = parser.parse_args()
-
-path = args.path_base
-path_img = args.path_img
-path_preds = args.path_preds
-
-
-learn, data = get_model_data(Path(path))
-learn = learn.to_fp32()
-
-
-def save_preds(path_img, path_preds=None):
     if path_preds is not None:
         os.mkdir(path_preds) if not os.path.exists(path_preds) else None
 
-    os.chdir(path_img)
-    files = [f for f in os.listdir(
-        path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
+    # Get the original directory to restore it later
+    orig_dir = os.getcwd()
+    try:
+        os.chdir(path_img)
+        files = [f for f in os.listdir(
+            path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
+        print(files)
 
-    bdf_list = []
+        if not files:
+            bdf = pd.DataFrame()
+        else:
+            records = []
+            for file in files:
+                # open file
+                from fastai.vision import open_image
+                x = open_image(file)
 
-    for file in files:
-        # open file
-        x = open_image(file)
+                # get preds
+                preds_num = learn.predict(x)[2].numpy() * 100
 
-        # get preds
-        preds_num = learn.predict(x)[2].numpy()
+                record = dict(zip(data.classes, preds_num))
+                record['shot'] = str(file)
+                records.append(record)
 
-        # form data-frame
-        df = pd.DataFrame(list(zip(data.classes, preds_num)),
-                          columns=['shot-type', 'prediction'])
+            df = pd.DataFrame(records)
 
-        # reorder data-frame from largest to smallest shot size
-        df['shot-type'] = pd.Categorical(df['shot-type'],
-                                         ['LS', 'FS', 'MS', 'CS', 'ECS'])
-        df = df.sort_values('shot-type').reset_index(drop=True)
+            # Enforce tie-breaking sequence
+            classes_ordered = ['LS', 'FS', 'MS', 'CS', 'ECS']
+            df_classes = df[classes_ordered]
 
-        # probability --> percentage
-        df['prediction'] *= 100
+            bdf = pd.DataFrame({
+                'shot-type': df_classes.idxmax(axis=1),
+                'prediction': df_classes.max(axis=1),
+                'shot': df['shot']
+            })
 
-        df = df.sort_values('prediction', ascending=False)
+        bdfname = "preds.csv"
+        if path_preds is not None:
+            bdf.to_csv(Path(path_preds)/bdfname, index=False)
+        else:
+            bdf.to_csv(Path(path_img)/bdfname, index=False)
+    finally:
+        os.chdir(orig_dir)
 
-        df = df.head(1)
+if __name__ == '__main__':
+    warnings.filterwarnings('ignore', '.*default behavior*', )
+    warnings.filterwarnings('ignore', '.*torch.solve*', )
 
-        df['shot'] = str(file)
+    parser = argparse.ArgumentParser(
+        description='''
+        ======================================================================
+                 Predict shot types using a pretrained ResNet-50
+        ======================================================================
 
-        bdf_list.append(df)
+         Usage
+        -------
 
-        # save to disk
-        #fname = file.rpartition('.')[0] + '_preds.csv'
-        # if path_preds is not None:
-        #    df.to_csv(Path(path_preds)/fname, index=False)
+        python get-preds.py
+            --path_base '/home/user/shot-type-classifier'
+            --path_img '/home/user/Desktop/imgs'
+            --path_preds '/home/user/Desktop/imgs/preds'
+        ''', formatter_class=argparse.RawTextHelpFormatter)
 
-        # else:
-        #    df.to_csv(Path(path_img)/fname, index=False)
+    parser.add_argument('--path_base', type=str,
+                        help='path to the "shot-type-classifier" directory')
+    parser.add_argument('--path_img', type=str,
+                        help='path to where the images are stored')
+    parser.add_argument('--path_preds', type=str, default=None,
+                        help="path where you'd like to store the predictions")
+    args = parser.parse_args()
 
-    if bdf_list:
-        bdf = pd.concat(bdf_list, ignore_index=True)
-    else:
-        bdf = pd.DataFrame()
+    path = args.path_base
+    path_img = args.path_img
+    path_preds = args.path_preds
 
-    bdfname = "preds.csv"
-    if path_preds is not None:
-        bdf.to_csv(Path(path_preds)/bdfname, index=False)
-    else:
-        bdf.to_csv(Path(path_img)/bdfname, index=False)
+    learn, data = get_model_data(Path(path))
+    learn = learn.to_fp32()
 
-
-save_preds(path_img, path_preds)
+    save_preds(path_img, path_preds, learn=learn, data=data)
