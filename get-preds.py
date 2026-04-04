@@ -1,3 +1,7 @@
+import os
+import pandas as pd
+from pathlib import Path
+from fastai.vision import open_image
 from initialise import *
 import argparse
 import warnings
@@ -73,9 +77,9 @@ if __name__ == '__main__':
             --path_preds '/home/user/Desktop/imgs/preds'
         ''', formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument('--path_base', type=str, required=True,
+    parser.add_argument('--path_base', type=str,
                         help='path to the "shot-type-classifier" directory')
-    parser.add_argument('--path_img', type=str, required=True,
+    parser.add_argument('--path_img', type=str,
                         help='path to where the images are stored')
     parser.add_argument('--path_preds', type=str, default=None,
                         help="path where you'd like to store the predictions")
