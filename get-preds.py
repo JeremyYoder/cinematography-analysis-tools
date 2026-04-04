@@ -11,7 +11,7 @@ warnings.filterwarnings('ignore', '.*torch.solve*', )
 
 def save_preds(learn, data, path_img, path_preds=None):
     if path_preds is not None:
-        os.mkdir(path_preds) if not os.path.exists(path_preds) else None
+        os.makedirs(path_preds, exist_ok=True)
 
     os.chdir(path_img)
     files = [f for f in os.listdir(
