@@ -18,34 +18,30 @@ def hooked_backward(m, xb, y):
             preds[0,int(y)].backward()
     return hook_a,hook_g
 
-def show_heatmap(xb_im, hm, path, y, idx, only_heatmap=False, interpolation='bilinear', alpha=0.5):
-    _,ax = plt.subplots(figsize=(5,3))
+def show_heatmap(xb_im, hm, path, y, idx, ax, only_heatmap=False, interpolation='bilinear', alpha=0.5):
+    ax.clear()
 
-    plt.gca().set_axis_off()
-    plt.gca().xaxis.set_major_locator(NullLocator())
-    plt.gca().yaxis.set_major_locator(NullLocator())
+    ax.set_axis_off()
+    ax.xaxis.set_major_locator(NullLocator())
+    ax.yaxis.set_major_locator(NullLocator())
 
     if not only_heatmap: xb_im.show(ax)
     ax.imshow(hm, alpha=alpha, extent=(0,666,375,0),
               interpolation=interpolation, cmap='YlOrRd')
     fname = f'{str(y)}_{str(idx+1)}_heatmap.png'
-    plt.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
+    ax.figure.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
 
-    plt.close()
-    plt.close('all')
+def save_img(img, path, y, idx, ax):
+    ax.clear()
 
-def save_img(img, path, y, idx):
-    img.show(figsize = (5,3))
+    img.show(ax)
 
-    plt.gca().set_axis_off()
-    plt.gca().xaxis.set_major_locator(NullLocator())
-    plt.gca().yaxis.set_major_locator(NullLocator())
+    ax.set_axis_off()
+    ax.xaxis.set_major_locator(NullLocator())
+    ax.yaxis.set_major_locator(NullLocator())
 
     fname = f'{str(y)}_{str(idx+1)}.png'
-    plt.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
-
-    plt.close()
-    plt.close('all')
+    ax.figure.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -124,6 +120,10 @@ def main():
                                       resize_method = ResizeMethod.SQUISH, no_check=True,
                                       num_workers = 0
                                      ).normalize(imagenet_stats)
+
+    # Initialize Matplotlib Figure and Axes once outside the loop for reuse
+    fig, ax = plt.subplots(figsize=(5,3))
+
     # heatmap generation
     for idx in range(len(temp.train_ds)):
         x,y = temp.train_ds[idx]
@@ -136,9 +136,11 @@ def main():
         acts  = hook_a.stored[0].cpu()
         avg_acts = acts.mean(0)
 
-        save_img(x, path_hms, y, idx)
-        show_heatmap(xb_im, avg_acts, path_hms, y, idx, only_heatmap=False, interpolation='spline16', alpha=alpha)
+        save_img(x, path_hms, y, idx, ax)
+        show_heatmap(xb_im, avg_acts, path_hms, y, idx, ax, only_heatmap=False, interpolation='spline16', alpha=alpha)
 
+    plt.close(fig)
+    plt.close('all')
 
     # deleting dummy directories and moving back files to where they were
     [os.rename(path_img/'train'/'img'/file, path_img/file) for file in files]
