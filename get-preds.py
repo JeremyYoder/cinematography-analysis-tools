@@ -12,6 +12,17 @@ from pathlib import Path
 warnings.filterwarnings('ignore', '.*default behavior*', )
 warnings.filterwarnings('ignore', '.*torch.solve*', )
 
+def validate_path(p, check_exists=False):
+    if p is not None:
+        path_obj = Path(p).resolve()
+        if '..' in Path(p).parts:
+            raise ValueError(f"Path traversal detected in path: {p}")
+        if path_obj.parts == ('/',) or path_obj.parent == Path('/'):
+            raise ValueError(f"Dangerous path detected: {p}")
+        if check_exists and not path_obj.is_dir():
+            raise ValueError(f"Path does not exist or is not a directory: {p}")
+    return p
+
 def save_preds(learn, data, path_img, path_preds=None):
     if path_preds is not None:
         os.mkdir(path_preds) if not os.path.exists(path_preds) else None
@@ -85,9 +96,9 @@ if __name__ == '__main__':
                         help="path where you'd like to store the predictions")
     args = parser.parse_args()
 
-    path = args.path_base
-    path_img = args.path_img
-    path_preds = args.path_preds
+    path = validate_path(args.path_base, check_exists=True)
+    path_img = validate_path(args.path_img, check_exists=True)
+    path_preds = validate_path(args.path_preds)
 
     learn, data = get_model_data(Path(path))
     learn = learn.to_fp32()
