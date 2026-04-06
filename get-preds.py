@@ -23,6 +23,8 @@ def save_preds(learn, data, path_img, path_preds=None):
 
     bdf_list = []
 
+    shot_order = {s: i for i, s in enumerate(['LS', 'FS', 'MS', 'CS', 'ECS'])}
+
     for file in files:
         # open file
         x = open_image(file)
@@ -30,28 +32,24 @@ def save_preds(learn, data, path_img, path_preds=None):
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # form data-frame
-        df = pd.DataFrame(list(zip(data.classes, preds_num)),
-                          columns=['shot-type', 'prediction'])
+        # Combine predictions with classes and map to tie-breaking order
+        preds = [(shot, float(prob) * 100, shot_order.get(shot, 99))
+                 for shot, prob in zip(data.classes, preds_num)]
 
-        # reorder data-frame from largest to smallest shot size
-        df['shot-type'] = pd.Categorical(df['shot-type'],
-                                         ['LS', 'FS', 'MS', 'CS', 'ECS'])
-        df = df.sort_values('shot-type').reset_index(drop=True)
+        # Sort by hierarchy index (tie-breaker) and then find the maximum by probability
+        # In case of equal probabilities, max() returns the first one it encounters.
+        # So we sort by tie-breaker first so the preferred shot type comes first.
+        preds.sort(key=lambda x: x[2])
+        best_shot = max(preds, key=lambda x: x[1])
 
-        # probability --> percentage
-        df['prediction'] *= 100
-
-        df = df.sort_values('prediction', ascending=False)
-
-        df = df.head(1)
-
-        df['shot'] = str(file)
-
-        bdf_list.append(df)
+        bdf_list.append({
+            'shot-type': best_shot[0],
+            'prediction': best_shot[1],
+            'shot': str(file)
+        })
 
     if bdf_list:
-        bdf = pd.concat(bdf_list, ignore_index=True)
+        bdf = pd.DataFrame(bdf_list)
     else:
         bdf = pd.DataFrame()
 
