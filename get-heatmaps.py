@@ -116,7 +116,8 @@ def main():
     os.mkdir(path_img/'train'/'img') if not os.path.exists(path_img/'train'/'img') else None
 
     # move from base dir to dummy train dir
-    [os.rename(path_img/file, path_img/'train'/'img'/file) for file in files]
+    for file in files:
+        os.rename(path_img/file, path_img/'train'/'img'/file)
 
 
     # dummy `ImageDataBunch`
@@ -141,7 +142,8 @@ def main():
 
 
     # deleting dummy directories and moving back files to where they were
-    [os.rename(path_img/'train'/'img'/file, path_img/file) for file in files]
+    for file in files:
+        os.rename(path_img/'train'/'img'/file, path_img/file)
     rmtree(path_img/'train')
 
 if __name__ == '__main__':
