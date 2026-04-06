@@ -1,66 +1,24 @@
+import os
 import argparse
-
-parser = argparse.ArgumentParser(
-    description='''
-    ======================================================================
-      Generate actiavtion heatmaps of the ResNet-50 shot-type classifier
-    ======================================================================
-
-    Inconveniently, the names of the files when storing the heatmaps get
-    changed, and a lower res version of the heatmaps gets stored. However,
-    this can be changed with trivial modifications to the source code.
-
-     Usage
-    -------
-
-    python get-heatmaps.py
-        --path_base '/home/user/shot-type-classifier'
-        --path_img '/home/user/Desktop/imgs'
-        --path_hms '/home/user/Desktop/imgs/heatmaps'
-        --alpha 0.8
-    ''', formatter_class=argparse.RawTextHelpFormatter)
-
-parser.add_argument('--path_base', type=str,
-                    help='path to the "shot-type-classifier" directory')
-parser.add_argument('--path_img', type=str,
-                    help='path to where the images are stored')
-parser.add_argument('--path_hms', type=str, default = None,
-                    help="(optional) path where you'd like to store the heatmaps, if not in the same directory as the images")
-parser.add_argument('--alpha', type=float, default = 0.5,
-                    help="degree to which you'd like to blend the heatmaps with the original image. Enter 1.0 if you'd like only the heatmap. Default value = 0.5")
-args = parser.parse_args()
-
-path     = args.path_base
-path_img = args.path_img
-path_hms = args.path_hms
-alpha    = args.alpha
+import torch
+import matplotlib.pyplot as plt
+from pathlib import Path
+from shutil import rmtree
+from fastai.callbacks.hooks import hook_output
+from matplotlib.ticker import NullLocator
+from fastai.vision import Image, ImageDataBunch, ResizeMethod, imagenet_stats
 
 from initialise import *
 
-###############################################################################
-##############################  SETUP  ########################################
-###############################################################################
-
-learn, data = get_model_data(Path(path))
-
-from shutil import rmtree
-from fastai.callbacks.hooks import *
-from matplotlib.ticker import NullLocator
-
-learn = learn.to_fp32()
-x,y = data.valid_ds[0]
-
-m = learn.model.eval();
-
-def hooked_backward(cat=y):
+def hooked_backward(m, xb, y):
     # m[0] is the first part of the network i.e. NOT the FC layer
     with hook_output(m[0]) as hook_a:
         with hook_output(m[0], grad=True) as hook_g:
             preds = m(xb)
-            preds[0,int(cat)].backward()
+            preds[0,int(y)].backward()
     return hook_a,hook_g
 
-def show_heatmap(hm, path, only_heatmap=False, interpolation='bilinear', alpha=0.5):
+def show_heatmap(xb_im, hm, path, y, idx, only_heatmap=False, interpolation='bilinear', alpha=0.5):
     _,ax = plt.subplots(figsize=(5,3))
 
     plt.gca().set_axis_off()
@@ -69,20 +27,19 @@ def show_heatmap(hm, path, only_heatmap=False, interpolation='bilinear', alpha=0
 
     if not only_heatmap: xb_im.show(ax)
     ax.imshow(hm, alpha=alpha, extent=(0,666,375,0),
-              interpolation=interpolation, cmap='YlOrRd');
+              interpolation=interpolation, cmap='YlOrRd')
     fname = f'{str(y)}_{str(idx+1)}_heatmap.png'
     plt.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
 
     plt.close()
     plt.close('all')
 
-def save_img(img, path):
+def save_img(img, path, y, idx):
     img.show(figsize = (5,3))
 
     plt.gca().set_axis_off()
     plt.gca().xaxis.set_major_locator(NullLocator())
     plt.gca().yaxis.set_major_locator(NullLocator())
-
 
     fname = f'{str(y)}_{str(idx+1)}.png'
     plt.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
