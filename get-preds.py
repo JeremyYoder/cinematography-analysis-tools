@@ -75,14 +75,6 @@ def save_preds(path_img, path_preds=None):
 
         bdf_list.append(df)
 
-        # save to disk
-        #fname = file.rpartition('.')[0] + '_preds.csv'
-        # if path_preds is not None:
-        #    df.to_csv(Path(path_preds)/fname, index=False)
-
-        # else:
-        #    df.to_csv(Path(path_img)/fname, index=False)
-
     if bdf_list:
         bdf = pd.concat(bdf_list, ignore_index=True)
     else:

@@ -129,7 +129,6 @@ temp = ImageDataBunch.from_folder(path_img, 'train', size = (375, 666), ds_tfms 
 for idx in range(len(temp.train_ds)):
     x,y = temp.train_ds[idx]
     print(f'# {idx+1} / {len(temp.train_ds)}')
-    #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
     xb = temp.one_item(x)[0]
     if torch.cuda.is_available(): xb = xb.cuda()
     xb_im = Image(temp.denorm(xb)[0])
