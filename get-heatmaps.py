@@ -10,6 +10,17 @@ from fastai.vision import Image, ImageDataBunch, ResizeMethod, imagenet_stats
 
 from initialise import *
 
+def validate_path(p, check_exists=False):
+    if p is not None:
+        path_obj = Path(p).resolve()
+        if '..' in Path(p).parts:
+            raise ValueError(f"Path traversal detected in path: {p}")
+        if path_obj.parts == ('/',) or path_obj.parent == Path('/'):
+            raise ValueError(f"Dangerous path detected: {p}")
+        if check_exists and not path_obj.is_dir():
+            raise ValueError(f"Path does not exist or is not a directory: {p}")
+    return p
+
 def hooked_backward(m, xb, y):
     # m[0] is the first part of the network i.e. NOT the FC layer
     with hook_output(m[0]) as hook_a:
@@ -78,9 +89,9 @@ def main():
                         help="degree to which you'd like to blend the heatmaps with the original image. Enter 1.0 if you'd like only the heatmap. Default value = 0.5")
     args = parser.parse_args()
 
-    path     = args.path_base
-    path_img = args.path_img
-    path_hms = args.path_hms
+    path     = validate_path(args.path_base, check_exists=True)
+    path_img = validate_path(args.path_img, check_exists=True)
+    path_hms = validate_path(args.path_hms)
     alpha    = args.alpha
 
     ###############################################################################
