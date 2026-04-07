@@ -107,20 +107,23 @@ def main():
 
     files = [f for f in os.listdir(path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
 
+    import tempfile
+
     # creating the required directories where needed
     # a dummy `ImageDataBunch` needs to be created to generate heatmaps
     if path_hms is not None:
         os.mkdir(path_hms) if not os.path.exists(path_hms) else None
 
-    os.mkdir(path_img/'train') if not os.path.exists(path_img/'train') else None
-    os.mkdir(path_img/'train'/'img') if not os.path.exists(path_img/'train'/'img') else None
+    dummy_train_dir = tempfile.mkdtemp(dir=path_img)
+    dummy_train_path = Path(dummy_train_dir)
+    os.mkdir(dummy_train_path/'img')
 
     # move from base dir to dummy train dir
-    [os.rename(path_img/file, path_img/'train'/'img'/file) for file in files]
+    [os.rename(path_img/file, dummy_train_path/'img'/file) for file in files]
 
 
     # dummy `ImageDataBunch`
-    temp = ImageDataBunch.from_folder(path_img, 'train', size = (375, 666), ds_tfms = None, bs=1,
+    temp = ImageDataBunch.from_folder(path_img, dummy_train_path.name, size = (375, 666), ds_tfms = None, bs=1,
                                       resize_method = ResizeMethod.SQUISH, no_check=True,
                                       num_workers = 0
                                      ).normalize(imagenet_stats)
@@ -141,8 +144,8 @@ def main():
 
 
     # deleting dummy directories and moving back files to where they were
-    [os.rename(path_img/'train'/'img'/file, path_img/file) for file in files]
-    rmtree(path_img/'train')
+    [os.rename(dummy_train_path/'img'/file, path_img/file) for file in files]
+    rmtree(dummy_train_path)
 
 if __name__ == '__main__':
     main()
