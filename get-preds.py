@@ -21,7 +21,10 @@ def save_preds(learn, data, path_img, path_preds=None):
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
     print(files)
 
-    bdf_list = []
+    records = []
+    # Hierarchy for tie-breaking: earlier in list has higher priority if predictions are equal
+    shot_hierarchy = ['LS', 'FS', 'MS', 'CS', 'ECS']
+    shot_to_index = {shot: i for i, shot in enumerate(shot_hierarchy)}
 
     for file in files:
         # open file
@@ -30,30 +33,25 @@ def save_preds(learn, data, path_img, path_preds=None):
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # form data-frame
-        df = pd.DataFrame(list(zip(data.classes, preds_num)),
-                          columns=['shot-type', 'prediction'])
+        # ⚡ Bolt: Instead of creating, sorting, and slicing a pandas DataFrame
+        # per file in the loop, we find the max prediction using a simple max()
+        # with a tie-breaker tuple (prediction_value, -hierarchy_index).
+        best_class, best_prob = max(
+            zip(data.classes, preds_num),
+            key=lambda item: (item[1], -shot_to_index.get(item[0], 999))
+        )
 
-        # reorder data-frame from largest to smallest shot size
-        df['shot-type'] = pd.Categorical(df['shot-type'],
-                                         ['LS', 'FS', 'MS', 'CS', 'ECS'])
-        df = df.sort_values('shot-type').reset_index(drop=True)
+        records.append({
+            'shot-type': best_class,
+            'prediction': best_prob * 100,
+            'shot': str(file)
+        })
 
-        # probability --> percentage
-        df['prediction'] *= 100
-
-        df = df.sort_values('prediction', ascending=False)
-
-        df = df.head(1)
-
-        df['shot'] = str(file)
-
-        bdf_list.append(df)
-
-    if bdf_list:
-        bdf = pd.concat(bdf_list, ignore_index=True)
+    # ⚡ Bolt: Construct a single DataFrame at the end
+    if records:
+        bdf = pd.DataFrame(records)
     else:
-        bdf = pd.DataFrame()
+        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
 
     bdfname = "preds.csv"
     if path_preds is not None:
