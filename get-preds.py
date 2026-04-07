@@ -13,15 +13,18 @@ warnings.filterwarnings('ignore', '.*default behavior*', )
 warnings.filterwarnings('ignore', '.*torch.solve*', )
 
 def save_preds(learn, data, path_img, path_preds=None):
+    path_img = validate_path(path_img, check_exists=True)
+
     if path_preds is not None:
+        path_preds = validate_path(path_preds)
         os.mkdir(path_preds) if not os.path.exists(path_preds) else None
 
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
 
     bdf_list = []
+    hierarchy = ['LS', 'FS', 'MS', 'CS', 'ECS']
 
     for file in files:
         # open file
@@ -30,28 +33,29 @@ def save_preds(learn, data, path_img, path_preds=None):
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # form data-frame
-        df = pd.DataFrame(list(zip(data.classes, preds_num)),
-                          columns=['shot-type', 'prediction'])
+        # Determine best prediction efficiently using native python
+        best_class_idx = -1
+        best_prob = -1.0
+        best_class = None
 
-        # reorder data-frame from largest to smallest shot size
-        df['shot-type'] = pd.Categorical(df['shot-type'],
-                                         ['LS', 'FS', 'MS', 'CS', 'ECS'])
-        df = df.sort_values('shot-type').reset_index(drop=True)
+        for idx, (cls, prob) in enumerate(zip(data.classes, preds_num)):
+            if prob > best_prob or (prob == best_prob and (best_class is None or hierarchy.index(cls) < hierarchy.index(best_class))):
+                best_prob = prob
+                best_class = cls
+                best_class_idx = idx
 
-        # probability --> percentage
-        df['prediction'] *= 100
+        # Convert to percentage
+        best_prob *= 100
 
-        df = df.sort_values('prediction', ascending=False)
-
-        df = df.head(1)
-
-        df['shot'] = str(file)
-
-        bdf_list.append(df)
+        # Append as a dict
+        bdf_list.append({
+            'shot-type': best_class,
+            'prediction': best_prob,
+            'shot': str(file)
+        })
 
     if bdf_list:
-        bdf = pd.concat(bdf_list, ignore_index=True)
+        bdf = pd.DataFrame(bdf_list)
     else:
         bdf = pd.DataFrame()
 
@@ -85,7 +89,7 @@ if __name__ == '__main__':
                         help="path where you'd like to store the predictions")
     args = parser.parse_args()
 
-    path = args.path_base
+    path = validate_path(args.path_base, check_exists=True)
     path_img = args.path_img
     path_preds = args.path_preds
 
