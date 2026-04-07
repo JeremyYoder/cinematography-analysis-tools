@@ -78,16 +78,15 @@ def main():
                         help="degree to which you'd like to blend the heatmaps with the original image. Enter 1.0 if you'd like only the heatmap. Default value = 0.5")
     args = parser.parse_args()
 
-    path     = args.path_base
-    path_img = args.path_img
-    path_hms = args.path_hms
+    path     = validate_path(args.path_base, check_exists=True)
+    path_img = validate_path(args.path_img, check_exists=True)
     alpha    = args.alpha
 
     ###############################################################################
     ##############################  SETUP  ########################################
     ###############################################################################
 
-    learn, data = get_model_data(Path(path))
+    learn, data = get_model_data(path)
 
     learn = learn.to_fp32()
 
@@ -99,9 +98,8 @@ def main():
     ########################## GENERATING HEATMAPS ################################
     ###############################################################################
 
-    path_img = Path(path_img)
-    if path_hms is not None:
-        path_hms = Path(path_hms)
+    if args.path_hms is not None:
+        path_hms = validate_path(args.path_hms)
     else:
         path_hms = path_img
 
@@ -116,7 +114,8 @@ def main():
     os.mkdir(path_img/'train'/'img') if not os.path.exists(path_img/'train'/'img') else None
 
     # move from base dir to dummy train dir
-    [os.rename(path_img/file, path_img/'train'/'img'/file) for file in files]
+    for file in files:
+        os.rename(path_img/file, path_img/'train'/'img'/file)
 
 
     # dummy `ImageDataBunch`
@@ -128,7 +127,6 @@ def main():
     for idx in range(len(temp.train_ds)):
         x,y = temp.train_ds[idx]
         print(f'# {idx+1} / {len(temp.train_ds)}')
-        #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
         xb = temp.one_item(x)[0]
         if torch.cuda.is_available(): xb = xb.cuda()
         xb_im = Image(temp.denorm(xb)[0])
@@ -141,7 +139,8 @@ def main():
 
 
     # deleting dummy directories and moving back files to where they were
-    [os.rename(path_img/'train'/'img'/file, path_img/file) for file in files]
+    for file in files:
+        os.rename(path_img/'train'/'img'/file, path_img/file)
     rmtree(path_img/'train')
 
 if __name__ == '__main__':

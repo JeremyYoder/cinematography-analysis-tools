@@ -33,11 +33,12 @@ sys.modules["get_preds"] = get_preds
 spec.loader.exec_module(get_preds)
 
 class TestGetPreds(unittest.TestCase):
+    @patch('get_preds.validate_path')
     @patch('os.listdir')
     @patch('get_preds.open_image', create=True)
     @patch('pandas.DataFrame.to_csv')
     @patch('os.chdir')
-    def test_save_preds(self, mock_chdir, mock_to_csv, mock_open_image, mock_listdir):
+    def test_save_preds(self, mock_chdir, mock_to_csv, mock_open_image, mock_listdir, mock_validate_path):
         # Setup mock dependencies
         mock_learn = MagicMock()
         mock_data = MagicMock()
@@ -51,12 +52,14 @@ class TestGetPreds(unittest.TestCase):
         mock_listdir.return_value = ['test1.jpg', 'test2.png', 'test3.txt']
         mock_open_image.return_value = MagicMock()
 
+        mock_validate_path.side_effect = lambda x, **kwargs: Path(x)
+
         # Call save_preds
         path_img = '/fake/img/path'
         get_preds.save_preds(mock_learn, mock_data, path_img)
 
         # Verify chdir was called with path_img
-        mock_chdir.assert_called_with(path_img)
+        mock_chdir.assert_called_with(Path(path_img))
 
         # Verify open_image was called for the image files only
         self.assertEqual(mock_open_image.call_count, 2)
@@ -72,13 +75,14 @@ class TestGetPreds(unittest.TestCase):
         self.assertEqual(args[0], Path(path_img) / 'preds.csv')
         self.assertEqual(kwargs.get('index'), False)
 
+    @patch('get_preds.validate_path')
     @patch('os.path.exists')
     @patch('os.mkdir')
     @patch('os.listdir')
     @patch('get_preds.open_image', create=True)
     @patch('pandas.DataFrame.to_csv')
     @patch('os.chdir')
-    def test_save_preds_with_path_preds(self, mock_chdir, mock_to_csv, mock_open_image, mock_listdir, mock_mkdir, mock_exists):
+    def test_save_preds_with_path_preds(self, mock_chdir, mock_to_csv, mock_open_image, mock_listdir, mock_mkdir, mock_exists, mock_validate_path):
         mock_learn = MagicMock()
         mock_data = MagicMock()
         mock_data.classes = ['LS', 'FS', 'MS', 'CS', 'ECS']
@@ -90,13 +94,15 @@ class TestGetPreds(unittest.TestCase):
         mock_exists.return_value = False
         mock_listdir.return_value = ['test1.jpg']
 
+        mock_validate_path.side_effect = lambda x, **kwargs: Path(x)
+
         path_img = '/fake/img/path'
         path_preds = '/fake/preds/path'
 
         get_preds.save_preds(mock_learn, mock_data, path_img, path_preds=path_preds)
 
         # Verify mkdir was called because exists returned False
-        mock_mkdir.assert_called_once_with(path_preds)
+        mock_mkdir.assert_called_once_with(Path(path_preds))
 
         # Verify to_csv was called with path_preds
         self.assertEqual(mock_to_csv.call_count, 1)
