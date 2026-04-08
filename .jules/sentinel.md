@@ -1,0 +1,4 @@
+## 2024-05-24 - [CRITICAL] Arbitrary user data deletion via hardcoded temporary directory
+**Vulnerability:** Arbitrary user data deletion (CWE-377/CWE-379). `get-heatmaps.py` hardcoded a temporary directory name (`train`) in a user-provided directory, and subsequently deleted it via `shutil.rmtree()` upon completion. If a user already had a directory named `train` in that path, their data would be permanently lost.
+**Learning:** Temporary directory creation for intermediate file processing should never use hardcoded names within user-accessible spaces without explicit conflict checks, as it exposes users to severe data loss and symlink attacks.
+**Prevention:** Always dynamically provision temporary directories using `tempfile.mkdtemp()` (or similar secure primitives) to guarantee unique directory names and prevent accidental overwrites or malicious race conditions.
