@@ -1,0 +1,4 @@
+## 2024-05-01 - [CRITICAL] Arbitrary file deletion vulnerability due to hardcoded temporary directory
+**Vulnerability:** The `get-heatmaps.py` script hardcoded a `train` folder in a user-provided image path to use as a dummy `ImageDataBunch` directory. If the user already had a `train` directory in that path, it would be used, and then subsequently deleted using `shutil.rmtree()` at the end of the script execution. This could lead to catastrophic deletion of user's pre-existing data (CWE-377/CWE-379).
+**Learning:** Scripts that process files dynamically shouldn't rely on hardcoded paths for temporary data storage or manipulation within user-controlled paths.
+**Prevention:** Always use `tempfile.mkdtemp` (or similar standard library equivalents) to dynamically provision unique temporary directories to prevent arbitrary deletion of pre-existing user data and mitigate symlink/race condition attacks.
