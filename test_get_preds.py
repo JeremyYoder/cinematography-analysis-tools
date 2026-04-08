@@ -1,11 +1,12 @@
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
-import pandas as pd
 import os
 from pathlib import Path
 
-# Mock fastai and its components before importing get-preds or initialise
+# Mock pandas, fastai, and its components before importing get-preds or initialise
+mock_pandas = MagicMock()
+sys.modules['pandas'] = mock_pandas
 mock_fastai = MagicMock()
 mock_fastai_vision = MagicMock()
 sys.modules['fastai'] = mock_fastai
@@ -35,9 +36,8 @@ spec.loader.exec_module(get_preds)
 class TestGetPreds(unittest.TestCase):
     @patch('os.listdir')
     @patch('get_preds.open_image', create=True)
-    @patch('pandas.DataFrame.to_csv')
     @patch('os.chdir')
-    def test_save_preds(self, mock_chdir, mock_to_csv, mock_open_image, mock_listdir):
+    def test_save_preds(self, mock_chdir, mock_open_image, mock_listdir):
         # Setup mock dependencies
         mock_learn = MagicMock()
         mock_data = MagicMock()
@@ -66,19 +66,20 @@ class TestGetPreds(unittest.TestCase):
         # Verify predict was called
         self.assertEqual(mock_learn.predict.call_count, 2)
 
-        # Verify to_csv was called once to save preds.csv
+        # Verify to_csv was called once to save preds.csv on the global mocked pandas object
+        mock_to_csv = mock_pandas.DataFrame.return_value.to_csv
         self.assertEqual(mock_to_csv.call_count, 1)
         args, kwargs = mock_to_csv.call_args
         self.assertEqual(args[0], Path(path_img) / 'preds.csv')
         self.assertEqual(kwargs.get('index'), False)
+        mock_to_csv.reset_mock()
 
     @patch('os.path.exists')
     @patch('os.mkdir')
     @patch('os.listdir')
     @patch('get_preds.open_image', create=True)
-    @patch('pandas.DataFrame.to_csv')
     @patch('os.chdir')
-    def test_save_preds_with_path_preds(self, mock_chdir, mock_to_csv, mock_open_image, mock_listdir, mock_mkdir, mock_exists):
+    def test_save_preds_with_path_preds(self, mock_chdir, mock_open_image, mock_listdir, mock_mkdir, mock_exists):
         mock_learn = MagicMock()
         mock_data = MagicMock()
         mock_data.classes = ['LS', 'FS', 'MS', 'CS', 'ECS']
@@ -99,9 +100,11 @@ class TestGetPreds(unittest.TestCase):
         mock_mkdir.assert_called_once_with(path_preds)
 
         # Verify to_csv was called with path_preds
+        mock_to_csv = mock_pandas.DataFrame.return_value.to_csv
         self.assertEqual(mock_to_csv.call_count, 1)
         args, kwargs = mock_to_csv.call_args
         self.assertEqual(args[0], Path(path_preds) / 'preds.csv')
+        mock_to_csv.reset_mock()
 
 if __name__ == '__main__':
     unittest.main()
