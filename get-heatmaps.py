@@ -2,6 +2,7 @@ import os
 import argparse
 import torch
 import matplotlib.pyplot as plt
+import tempfile
 from pathlib import Path
 from shutil import rmtree
 from fastai.callbacks.hooks import hook_output
@@ -112,15 +113,17 @@ def main():
     if path_hms is not None:
         os.mkdir(path_hms) if not os.path.exists(path_hms) else None
 
-    os.mkdir(path_img/'train') if not os.path.exists(path_img/'train') else None
-    os.mkdir(path_img/'train'/'img') if not os.path.exists(path_img/'train'/'img') else None
+    dummy_train_dir = Path(tempfile.mkdtemp(dir=path_img))
+    dummy_img_dir = dummy_train_dir / 'img'
+    os.mkdir(dummy_img_dir)
 
     # move from base dir to dummy train dir
-    [os.rename(path_img/file, path_img/'train'/'img'/file) for file in files]
+    for file in files:
+        os.rename(path_img/file, dummy_img_dir/file)
 
 
     # dummy `ImageDataBunch`
-    temp = ImageDataBunch.from_folder(path_img, 'train', size = (375, 666), ds_tfms = None, bs=1,
+    temp = ImageDataBunch.from_folder(path_img, dummy_train_dir.name, size = (375, 666), ds_tfms = None, bs=1,
                                       resize_method = ResizeMethod.SQUISH, no_check=True,
                                       num_workers = 0
                                      ).normalize(imagenet_stats)
@@ -141,8 +144,9 @@ def main():
 
 
     # deleting dummy directories and moving back files to where they were
-    [os.rename(path_img/'train'/'img'/file, path_img/file) for file in files]
-    rmtree(path_img/'train')
+    for file in files:
+        os.rename(dummy_img_dir/file, path_img/file)
+    rmtree(dummy_train_dir)
 
 if __name__ == '__main__':
     main()
