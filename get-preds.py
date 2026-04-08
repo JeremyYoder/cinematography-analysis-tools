@@ -23,6 +23,12 @@ def save_preds(learn, data, path_img, path_preds=None):
 
     bdf_list = []
 
+    # ⚡ Bolt: Performance Optimization
+    # 💡 What: Precompute the hierarchy and process predictions with native Python primitives.
+    # 🎯 Why: Iteratively instantiating and sorting Pandas DataFrames inside a loop over files is computationally expensive and slow.
+    # 📊 Impact: Substantially reduces memory allocation and CPU usage per file, resulting in faster processing of large datasets.
+    shot_hierarchy = {k: v for v, k in enumerate(['LS', 'FS', 'MS', 'CS', 'ECS'])}
+
     for file in files:
         # open file
         x = open_image(file)
@@ -30,30 +36,25 @@ def save_preds(learn, data, path_img, path_preds=None):
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # form data-frame
-        df = pd.DataFrame(list(zip(data.classes, preds_num)),
-                          columns=['shot-type', 'prediction'])
+        # Extract items
+        items = list(zip(data.classes, preds_num))
 
-        # reorder data-frame from largest to smallest shot size
-        df['shot-type'] = pd.Categorical(df['shot-type'],
-                                         ['LS', 'FS', 'MS', 'CS', 'ECS'])
-        df = df.sort_values('shot-type').reset_index(drop=True)
+        # Find best prediction
+        # If predictions tie, it breaks ties based on the shot hierarchy where lower index is better.
+        best_cls, best_pred = max(items, key=lambda i: (i[1], -shot_hierarchy.get(i[0], 999)))
 
-        # probability --> percentage
-        df['prediction'] *= 100
+        # Append top result to standard list
+        bdf_list.append({
+            'shot-type': best_cls,
+            'prediction': best_pred * 100.0,
+            'shot': str(file)
+        })
 
-        df = df.sort_values('prediction', ascending=False)
-
-        df = df.head(1)
-
-        df['shot'] = str(file)
-
-        bdf_list.append(df)
-
+    # Instantiate the DataFrame just once at the end
     if bdf_list:
-        bdf = pd.concat(bdf_list, ignore_index=True)
+        bdf = pd.DataFrame(bdf_list)
     else:
-        bdf = pd.DataFrame()
+        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
 
     bdfname = "preds.csv"
     if path_preds is not None:
