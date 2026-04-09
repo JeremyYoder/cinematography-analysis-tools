@@ -1,0 +1,3 @@
+## 2024-05-14 - Optimize inner prediction loop parsing speed
+**Learning:** Instantiating Pandas DataFrames, enforcing categorical variables, and sorting inside an iterative image processing loop severely degrades performance (up to a 500x slowdown).
+**Action:** When repeatedly mapping values or tie-breaking hierarchical predictions within loops, avoid DataFrame creation entirely. Instead, use native Python structures (e.g., standard dictionaries/tuples) and the `max()` function with a custom lookup-table based lambda key (e.g., `lambda p: (p[1], -hierarchy_map.get(p[0], 999))`). Only instantiate the DataFrame once all records are collected.
