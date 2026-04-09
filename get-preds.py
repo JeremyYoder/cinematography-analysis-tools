@@ -19,11 +19,17 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
+
+    if not files:
+        print(f"No images found in {path_img}. Exiting.")
+        return
+
+    print(f"Found {len(files)} images. Starting prediction...")
 
     bdf_list = []
 
-    for file in files:
+    for idx, file in enumerate(files):
+        print(f"Processing [{idx+1}/{len(files)}]: {file}")
         # open file
         x = open_image(file)
 
@@ -57,9 +63,12 @@ def save_preds(learn, data, path_img, path_preds=None):
 
     bdfname = "preds.csv"
     if path_preds is not None:
-        bdf.to_csv(Path(path_preds)/bdfname, index=False)
+        save_path = Path(path_preds)/bdfname
+        bdf.to_csv(save_path, index=False)
     else:
-        bdf.to_csv(Path(path_img)/bdfname, index=False)
+        save_path = Path(path_img)/bdfname
+        bdf.to_csv(save_path, index=False)
+    print(f"\n✅ Predictions saved to {save_path}")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
