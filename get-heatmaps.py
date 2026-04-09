@@ -1,6 +1,7 @@
 import os
 import argparse
 import torch
+import tempfile
 import matplotlib.pyplot as plt
 from pathlib import Path
 from shutil import rmtree
@@ -112,37 +113,42 @@ def main():
     if path_hms is not None:
         os.mkdir(path_hms) if not os.path.exists(path_hms) else None
 
-    os.mkdir(path_img/'train') if not os.path.exists(path_img/'train') else None
-    os.mkdir(path_img/'train'/'img') if not os.path.exists(path_img/'train'/'img') else None
+    # Use a secure temporary directory to prevent race conditions and arbitrary file deletion
+    temp_train_dir = tempfile.mkdtemp(dir=str(path_img))
+    temp_train_path = Path(temp_train_dir)
+    img_dir = temp_train_path / 'img'
+    os.mkdir(img_dir)
 
-    # move from base dir to dummy train dir
-    [os.rename(path_img/file, path_img/'train'/'img'/file) for file in files]
+    try:
+        # move from base dir to dummy train dir
+        for file in files:
+            os.rename(path_img/file, img_dir/file)
 
+        # dummy `ImageDataBunch`
+        temp = ImageDataBunch.from_folder(temp_train_path, '.', size = (375, 666), ds_tfms = None, bs=1,
+                                          resize_method = ResizeMethod.SQUISH, no_check=True,
+                                          num_workers = 0
+                                         ).normalize(imagenet_stats)
+        # heatmap generation
+        for idx in range(len(temp.train_ds)):
+            x,y = temp.train_ds[idx]
+            print(f'# {idx+1} / {len(temp.train_ds)}')
+            #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
+            xb = temp.one_item(x)[0]
+            if torch.cuda.is_available(): xb = xb.cuda()
+            xb_im = Image(temp.denorm(xb)[0])
+            hook_a,hook_g = hooked_backward(m, xb, y)
+            acts  = hook_a.stored[0].cpu()
+            avg_acts = acts.mean(0)
 
-    # dummy `ImageDataBunch`
-    temp = ImageDataBunch.from_folder(path_img, 'train', size = (375, 666), ds_tfms = None, bs=1,
-                                      resize_method = ResizeMethod.SQUISH, no_check=True,
-                                      num_workers = 0
-                                     ).normalize(imagenet_stats)
-    # heatmap generation
-    for idx in range(len(temp.train_ds)):
-        x,y = temp.train_ds[idx]
-        print(f'# {idx+1} / {len(temp.train_ds)}')
-        #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
-        xb = temp.one_item(x)[0]
-        if torch.cuda.is_available(): xb = xb.cuda()
-        xb_im = Image(temp.denorm(xb)[0])
-        hook_a,hook_g = hooked_backward(m, xb, y)
-        acts  = hook_a.stored[0].cpu()
-        avg_acts = acts.mean(0)
-
-        save_img(x, path_hms, y, idx)
-        show_heatmap(xb_im, avg_acts, path_hms, y, idx, only_heatmap=False, interpolation='spline16', alpha=alpha)
-
-
-    # deleting dummy directories and moving back files to where they were
-    [os.rename(path_img/'train'/'img'/file, path_img/file) for file in files]
-    rmtree(path_img/'train')
+            save_img(x, path_hms, y, idx)
+            show_heatmap(xb_im, avg_acts, path_hms, y, idx, only_heatmap=False, interpolation='spline16', alpha=alpha)
+    finally:
+        # safely move back files and clean up the temporary directory regardless of success or failure
+        for file in files:
+            if os.path.exists(img_dir/file):
+                os.rename(img_dir/file, path_img/file)
+        rmtree(temp_train_path)
 
 if __name__ == '__main__':
     main()
