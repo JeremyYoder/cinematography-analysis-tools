@@ -2,12 +2,9 @@ import os
 import pandas as pd
 from pathlib import Path
 from fastai.vision import open_image
-from initialise import *
+from initialise import get_model_data
 import argparse
 import warnings
-import os
-import pandas as pd
-from pathlib import Path
 
 warnings.filterwarnings('ignore', '.*default behavior*', )
 warnings.filterwarnings('ignore', '.*torch.solve*', )
@@ -19,7 +16,6 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
 
     bdf_list = []
 

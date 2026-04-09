@@ -8,7 +8,7 @@ from fastai.callbacks.hooks import hook_output
 from matplotlib.ticker import NullLocator
 from fastai.vision import Image, ImageDataBunch, ResizeMethod, imagenet_stats
 
-from initialise import *
+from initialise import get_model_data
 
 def hooked_backward(m, xb, y):
     # m[0] is the first part of the network i.e. NOT the FC layer
@@ -128,7 +128,6 @@ def main():
     for idx in range(len(temp.train_ds)):
         x,y = temp.train_ds[idx]
         print(f'# {idx+1} / {len(temp.train_ds)}')
-        #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
         xb = temp.one_item(x)[0]
         if torch.cuda.is_available(): xb = xb.cuda()
         xb_im = Image(temp.denorm(xb)[0])
