@@ -21,7 +21,10 @@ def save_preds(learn, data, path_img, path_preds=None):
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
     print(files)
 
+    # Using python dict to build results before Pandas DataFrame creation to improve performance
+    # by avoiding repeated memory allocation and object initialization in loop
     bdf_list = []
+    hierarchy = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
     for file in files:
         # open file
@@ -30,30 +33,21 @@ def save_preds(learn, data, path_img, path_preds=None):
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # form data-frame
-        df = pd.DataFrame(list(zip(data.classes, preds_num)),
-                          columns=['shot-type', 'prediction'])
+        # extract best prediction natively, tie-break with hierarchy
+        pairs = list(zip(data.classes, preds_num))
+        best_shot, best_pred = max(pairs, key=lambda x: (x[1], -hierarchy.get(x[0], 99)))
 
-        # reorder data-frame from largest to smallest shot size
-        df['shot-type'] = pd.Categorical(df['shot-type'],
-                                         ['LS', 'FS', 'MS', 'CS', 'ECS'])
-        df = df.sort_values('shot-type').reset_index(drop=True)
-
-        # probability --> percentage
-        df['prediction'] *= 100
-
-        df = df.sort_values('prediction', ascending=False)
-
-        df = df.head(1)
-
-        df['shot'] = str(file)
-
-        bdf_list.append(df)
+        bdf_list.append({
+            'shot-type': best_shot,
+            'prediction': best_pred * 100,
+            'shot': str(file)
+        })
 
     if bdf_list:
-        bdf = pd.concat(bdf_list, ignore_index=True)
+        # Create the DataFrame once
+        bdf = pd.DataFrame(bdf_list, columns=['shot-type', 'prediction', 'shot'])
     else:
-        bdf = pd.DataFrame()
+        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
 
     bdfname = "preds.csv"
     if path_preds is not None:
