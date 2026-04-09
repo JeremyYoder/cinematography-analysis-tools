@@ -4,6 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 from pathlib import Path
 from shutil import rmtree
+import tempfile
 from fastai.callbacks.hooks import hook_output
 from matplotlib.ticker import NullLocator
 from fastai.vision import Image, ImageDataBunch, ResizeMethod, imagenet_stats
@@ -112,37 +113,46 @@ def main():
     if path_hms is not None:
         os.mkdir(path_hms) if not os.path.exists(path_hms) else None
 
-    os.mkdir(path_img/'train') if not os.path.exists(path_img/'train') else None
-    os.mkdir(path_img/'train'/'img') if not os.path.exists(path_img/'train'/'img') else None
+    # Use secure temporary directory instead of hardcoded 'train'
+    temp_dir = tempfile.mkdtemp(dir=path_img, prefix="train_")
+    temp_dir_name = os.path.basename(temp_dir)
+    temp_img_dir = Path(temp_dir) / 'img'
+    os.makedirs(temp_img_dir)
 
-    # move from base dir to dummy train dir
-    [os.rename(path_img/file, path_img/'train'/'img'/file) for file in files]
-
-
-    # dummy `ImageDataBunch`
-    temp = ImageDataBunch.from_folder(path_img, 'train', size = (375, 666), ds_tfms = None, bs=1,
-                                      resize_method = ResizeMethod.SQUISH, no_check=True,
-                                      num_workers = 0
-                                     ).normalize(imagenet_stats)
-    # heatmap generation
-    for idx in range(len(temp.train_ds)):
-        x,y = temp.train_ds[idx]
-        print(f'# {idx+1} / {len(temp.train_ds)}')
-        #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
-        xb = temp.one_item(x)[0]
-        if torch.cuda.is_available(): xb = xb.cuda()
-        xb_im = Image(temp.denorm(xb)[0])
-        hook_a,hook_g = hooked_backward(m, xb, y)
-        acts  = hook_a.stored[0].cpu()
-        avg_acts = acts.mean(0)
-
-        save_img(x, path_hms, y, idx)
-        show_heatmap(xb_im, avg_acts, path_hms, y, idx, only_heatmap=False, interpolation='spline16', alpha=alpha)
+    try:
+        # move from base dir to dummy train dir
+        for file in files:
+            if os.path.exists(path_img/file):
+                os.rename(path_img/file, temp_img_dir/file)
 
 
-    # deleting dummy directories and moving back files to where they were
-    [os.rename(path_img/'train'/'img'/file, path_img/file) for file in files]
-    rmtree(path_img/'train')
+        # dummy `ImageDataBunch`
+        temp = ImageDataBunch.from_folder(path_img, temp_dir_name, size = (375, 666), ds_tfms = None, bs=1,
+                                          resize_method = ResizeMethod.SQUISH, no_check=True,
+                                          num_workers = 0
+                                         ).normalize(imagenet_stats)
+        # heatmap generation
+        for idx in range(len(temp.train_ds)):
+            x,y = temp.train_ds[idx]
+            print(f'# {idx+1} / {len(temp.train_ds)}')
+            #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
+            xb = temp.one_item(x)[0]
+            if torch.cuda.is_available(): xb = xb.cuda()
+            xb_im = Image(temp.denorm(xb)[0])
+            hook_a,hook_g = hooked_backward(m, xb, y)
+            acts  = hook_a.stored[0].cpu()
+            avg_acts = acts.mean(0)
+
+            save_img(x, path_hms, y, idx)
+            show_heatmap(xb_im, avg_acts, path_hms, y, idx, only_heatmap=False, interpolation='spline16', alpha=alpha)
+
+
+    finally:
+        # deleting dummy directories and moving back files to where they were
+        for file in files:
+            if os.path.exists(temp_img_dir/file):
+                os.rename(temp_img_dir/file, path_img/file)
+        rmtree(temp_dir)
 
 if __name__ == '__main__':
     main()
