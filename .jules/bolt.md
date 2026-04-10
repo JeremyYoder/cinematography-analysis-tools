@@ -1,0 +1,3 @@
+## 2024-04-10 - Pandas DataFrame Overhead in Loops
+**Learning:** Instantiating and concatenating Pandas DataFrames iteratively inside a loop is a significant performance bottleneck due to the overhead of Pandas object creation, especially for small, single-row DataFrames. Additionally, sorting operations on these small DataFrames are computationally expensive compared to native Python equivalents.
+**Action:** Replace iterative DataFrame creation and Pandas-based sorting (e.g., `df.sort_values`) inside loops with native Python data structures (like lists and dictionaries) and built-in functions (like `max()` with a custom tuple key). Construct a single, consolidated Pandas DataFrame from the list of dictionaries outside the loop to vastly improve runtime performance.
