@@ -23,6 +23,8 @@ def save_preds(learn, data, path_img, path_preds=None):
 
     bdf_list = []
 
+    hierarchy_map = {cls: i for i, cls in enumerate(['LS', 'FS', 'MS', 'CS', 'ECS'])}
+
     for file in files:
         # open file
         x = open_image(file)
@@ -30,28 +32,19 @@ def save_preds(learn, data, path_img, path_preds=None):
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # form data-frame
-        df = pd.DataFrame(list(zip(data.classes, preds_num)),
-                          columns=['shot-type', 'prediction'])
+        # Find best prediction using Python native max operation
+        # Sort by highest prediction, tie-breaking using the hierarchy order (lowest index wins)
+        preds = list(zip(data.classes, preds_num))
+        best_class, best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
-        # reorder data-frame from largest to smallest shot size
-        df['shot-type'] = pd.Categorical(df['shot-type'],
-                                         ['LS', 'FS', 'MS', 'CS', 'ECS'])
-        df = df.sort_values('shot-type').reset_index(drop=True)
-
-        # probability --> percentage
-        df['prediction'] *= 100
-
-        df = df.sort_values('prediction', ascending=False)
-
-        df = df.head(1)
-
-        df['shot'] = str(file)
-
-        bdf_list.append(df)
+        bdf_list.append({
+            'shot-type': best_class,
+            'prediction': best_pred * 100,
+            'shot': str(file)
+        })
 
     if bdf_list:
-        bdf = pd.concat(bdf_list, ignore_index=True)
+        bdf = pd.DataFrame(bdf_list)
     else:
         bdf = pd.DataFrame()
 

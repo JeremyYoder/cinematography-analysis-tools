@@ -1,0 +1,3 @@
+## 2024-04-10 - O(N) over O(N^2) DataFrame Creation
+**Learning:** Creating a DataFrame in pandas iteratively within a loop using `pd.DataFrame()` and appending is highly inefficient (O(N^2)). By aggregating values into a dictionary list and constructing the DataFrame once outside the loop, we get O(N) complexity. Furthermore, utilizing pure python logic like `max()` with a tuple key for categorical sequence sorting avoids the overhead of pandas type conversions inside iteration.
+**Action:** Always prefer batching list of dicts over looping and continuously creating DataFrames. When doing ranking in Python within a loop, use the built-in `max()` or `sorted()` with clever tuples instead of passing standard Python lists into pandas just to find top items.
