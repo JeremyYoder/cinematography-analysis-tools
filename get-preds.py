@@ -19,11 +19,17 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
+
+    if not files:
+        print(f"No images found in {path_img}. Exiting.")
+        return
+
+    print(f"Found {len(files)} images to process.")
 
     bdf_list = []
 
-    for file in files:
+    for idx, file in enumerate(files, 1):
+        print(f"Processing {idx}/{len(files)}: {file}")
         # open file
         x = open_image(file)
 
