@@ -74,5 +74,70 @@ class TestInitialise(unittest.TestCase):
             # they should be MagicMock objects
             self.assertIsInstance(tfm, MagicMock)
 
+    @patch('initialise.get_transforms')
+    @patch('initialise.xtra_tfms')
+    def test_get_tfms(self, mock_xtra_tfms, mock_get_transforms):
+        mock_xtra_tfms.return_value = ['mock_xtra']
+
+        initialise.get_tfms()
+
+        mock_get_transforms.assert_called_once_with(
+            do_flip=True,
+            flip_vert=False,
+            max_zoom=1.0,
+            max_lighting=0.4,
+            max_warp=0.3,
+            p_affine=0.85,
+            p_lighting=0.85,
+            xtra_tfms=['mock_xtra']
+        )
+        mock_xtra_tfms.assert_called_once()
+
+    @patch('initialise.get_tfms')
+    @patch('initialise.ImageDataBunch.from_folder')
+    @patch('initialise.cnn_learner')
+    @patch('initialise.models.resnet50')
+    @patch('initialise.Path')
+    def test_get_model_data(self, mock_path, mock_resnet50, mock_cnn_learner, mock_from_folder, mock_get_tfms):
+        # Reset mocks
+        mock_fastai_vision.ImageDataBunch.from_folder.reset_mock()
+        mock_fastai_vision.cnn_learner.reset_mock()
+
+        # Setup mocks
+        mock_path_obj = MagicMock()
+        mock_path.return_value = mock_path_obj
+
+        mock_get_tfms.return_value = 'mock_tfms'
+
+        mock_data = MagicMock()
+        mock_from_folder.return_value.normalize.return_value = mock_data
+
+        mock_learn = MagicMock()
+        mock_cnn_learner.return_value.to_fp16.return_value = mock_learn
+
+        # Call function
+        learn, data = initialise.get_model_data('fake_path')
+
+        # Verify calls
+        mock_path.assert_called_with('fake_path')
+        mock_from_folder.assert_called_once_with(
+            mock_path_obj, 'train', 'valid',
+            size=(375, 666),
+            ds_tfms='mock_tfms',
+            bs=1,
+            resize_method=mock_fastai_vision.ResizeMethod.SQUISH,
+            num_workers=0
+        )
+        mock_from_folder.return_value.normalize.assert_called_once_with(mock_fastai_vision.imagenet_stats)
+
+        mock_cnn_learner.assert_called_once_with(
+            mock_data, mock_fastai_vision.models.resnet50, metrics=[initialise.accuracy], pretrained=True
+        )
+        mock_cnn_learner.return_value.to_fp16.assert_called_once()
+        mock_learn.load.assert_called_once_with(mock_path_obj / 'models' / '50colabstage-3-2')
+
+        self.assertEqual(learn, mock_learn)
+        self.assertEqual(data, mock_data)
+
 if __name__ == '__main__':
     unittest.main()
