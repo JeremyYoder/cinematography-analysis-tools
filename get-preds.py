@@ -20,6 +20,10 @@ def save_preds(learn, data, path_img, path_preds=None):
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
 
+    if not files:
+        print("No images found to process. Exiting.")
+        return
+
     print(f"Found {len(files)} images to process.")
 
     bdf_list = []
@@ -82,6 +86,12 @@ if __name__ == '__main__':
     path = args.path_base
     path_img = args.path_img
     path_preds = args.path_preds
+
+    files = [f for f in os.listdir(path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
+    if not files:
+        print("No images found to process. Exiting.")
+        import sys
+        sys.exit(0)
 
     learn, data = get_model_data(Path(path))
     learn = learn.to_fp32()

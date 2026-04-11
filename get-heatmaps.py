@@ -84,6 +84,20 @@ def main():
     path_hms = args.path_hms
     alpha    = args.alpha
 
+    path_img = Path(path_img)
+    if path_hms is not None:
+        path_hms = Path(path_hms)
+    else:
+        path_hms = path_img
+
+    files = [f for f in os.listdir(path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
+    if not files:
+        print("No images found to process. Exiting.")
+        import sys
+        sys.exit(0)
+
+    print(f"Found {len(files)} images to process.")
+
     ###############################################################################
     ##############################  SETUP  ########################################
     ###############################################################################
@@ -99,14 +113,6 @@ def main():
     ###############################################################################
     ########################## GENERATING HEATMAPS ################################
     ###############################################################################
-
-    path_img = Path(path_img)
-    if path_hms is not None:
-        path_hms = Path(path_hms)
-    else:
-        path_hms = path_img
-
-    files = [f for f in os.listdir(path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
 
     # creating the required directories where needed
     # a dummy `ImageDataBunch` needs to be created to generate heatmaps
@@ -131,7 +137,7 @@ def main():
         # heatmap generation
         for idx in range(len(temp.train_ds)):
             x,y = temp.train_ds[idx]
-            print(f'# {idx+1} / {len(temp.train_ds)}')
+            print(f'Generating heatmap {idx+1}/{len(temp.train_ds)}...')
             #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
             xb = temp.one_item(x)[0]
             if torch.cuda.is_available(): xb = xb.cuda()
