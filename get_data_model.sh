@@ -1,9 +1,10 @@
 #!/bin/bash
+set -euo pipefail
 
 echo "Creating directories to store the model & data"
-mkdir models
-mkdir train
-mkdir valid
+mkdir -p models
+mkdir -p train
+mkdir -p valid
 
 ## ---- Download Models ----
 
