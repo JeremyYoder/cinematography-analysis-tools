@@ -1,9 +1,10 @@
 #!/bin/bash
+set -euo pipefail
 
 echo "Creating directories to store the model & data"
-mkdir models
-mkdir train
-mkdir valid
+mkdir -p models
+mkdir -p train
+mkdir -p valid
 
 ## ---- Download Models ----
 
@@ -17,10 +18,10 @@ echo "Downloading training data"
 cd ../train/
 gsutil cp gs://classifiermodel/train.zip .
 unzip train.zip
-rm train.zip
+rm -f train.zip
 
 echo "Downloading validation data"
 cd ../valid/
 gsutil cp gs://classifiermodel/valid.zip .
 unzip valid.zip
-rm valid.zip
+rm -f valid.zip

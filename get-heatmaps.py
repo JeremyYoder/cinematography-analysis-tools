@@ -48,42 +48,7 @@ def save_img(img, path, y, idx):
     plt.close()
     plt.close('all')
 
-def main():
-    parser = argparse.ArgumentParser(
-        description='''
-        ======================================================================
-          Generate actiavtion heatmaps of the ResNet-50 shot-type classifier
-        ======================================================================
-
-        Inconveniently, the names of the files when storing the heatmaps get
-        changed, and a lower res version of the heatmaps gets stored. However,
-        this can be changed with trivial modifications to the source code.
-
-         Usage
-        -------
-
-        python get-heatmaps.py
-            --path_base '/home/user/shot-type-classifier'
-            --path_img '/home/user/Desktop/imgs'
-            --path_hms '/home/user/Desktop/imgs/heatmaps'
-            --alpha 0.8
-        ''', formatter_class=argparse.RawTextHelpFormatter)
-
-    parser.add_argument('--path_base', type=str,
-                        help='path to the "shot-type-classifier" directory')
-    parser.add_argument('--path_img', type=str,
-                        help='path to where the images are stored')
-    parser.add_argument('--path_hms', type=str, default = None,
-                        help="(optional) path where you'd like to store the heatmaps, if not in the same directory as the images")
-    parser.add_argument('--alpha', type=float, default = 0.5,
-                        help="degree to which you'd like to blend the heatmaps with the original image. Enter 1.0 if you'd like only the heatmap. Default value = 0.5")
-    args = parser.parse_args()
-
-    path     = args.path_base
-    path_img = args.path_img
-    path_hms = args.path_hms
-    alpha    = args.alpha
-
+def generate_heatmaps(path, path_img, path_hms, alpha):
     ###############################################################################
     ##############################  SETUP  ########################################
     ###############################################################################
@@ -150,6 +115,45 @@ def main():
             if file_path.exists():
                 os.rename(file_path, path_img/file)
         rmtree(train_dir_path)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='''
+        ======================================================================
+          Generate actiavtion heatmaps of the ResNet-50 shot-type classifier
+        ======================================================================
+
+        Inconveniently, the names of the files when storing the heatmaps get
+        changed, and a lower res version of the heatmaps gets stored. However,
+        this can be changed with trivial modifications to the source code.
+
+         Usage
+        -------
+
+        python get-heatmaps.py
+            --path_base '/home/user/shot-type-classifier'
+            --path_img '/home/user/Desktop/imgs'
+            --path_hms '/home/user/Desktop/imgs/heatmaps'
+            --alpha 0.8
+        ''', formatter_class=argparse.RawTextHelpFormatter)
+
+    parser.add_argument('--path_base', type=str,
+                        help='path to the "shot-type-classifier" directory')
+    parser.add_argument('--path_img', type=str,
+                        help='path to where the images are stored')
+    parser.add_argument('--path_hms', type=str, default = None,
+                        help="(optional) path where you'd like to store the heatmaps, if not in the same directory as the images")
+    parser.add_argument('--alpha', type=float, default = 0.5,
+                        help="degree to which you'd like to blend the heatmaps with the original image. Enter 1.0 if you'd like only the heatmap. Default value = 0.5")
+    args = parser.parse_args()
+
+    path     = args.path_base
+    path_img = args.path_img
+    path_hms = args.path_hms
+    alpha    = args.alpha
+
+    generate_heatmaps(path, path_img, path_hms, alpha)
 
 if __name__ == '__main__':
     main()
