@@ -1,12 +1,18 @@
+import os
+import pandas as pd
+from pathlib import Path
+from fastai.vision import open_image
 from initialise import *
 import argparse
 import warnings
 import os
+import pandas as pd
+from pathlib import Path
 
 warnings.filterwarnings('ignore', '.*default behavior*', )
 warnings.filterwarnings('ignore', '.*torch.solve*', )
 
-def save_preds(path_img, learn, data, path_preds=None):
+def save_preds(learn, data, path_img, path_preds=None):
     if path_preds is not None:
         os.mkdir(path_preds) if not os.path.exists(path_preds) else None
 
@@ -55,7 +61,6 @@ def save_preds(path_img, learn, data, path_preds=None):
     else:
         bdf.to_csv(Path(path_img)/bdfname, index=False)
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='''
@@ -87,4 +92,4 @@ if __name__ == '__main__':
     learn, data = get_model_data(Path(path))
     learn = learn.to_fp32()
 
-    save_preds(path_img, learn, data, path_preds)
+    save_preds(learn, data, path_img, path_preds)

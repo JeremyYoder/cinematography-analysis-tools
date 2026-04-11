@@ -1,113 +1,107 @@
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
+import pandas as pd
 import os
+from pathlib import Path
+
+# Mock fastai and its components before importing get-preds or initialise
+mock_fastai = MagicMock()
+mock_fastai_vision = MagicMock()
+sys.modules['fastai'] = mock_fastai
+sys.modules['fastai.vision'] = mock_fastai_vision
+
+# Define mocks for functions used in initialise.py
+mock_functions = [
+    'cutout', 'jitter', 'skew', 'squish', 'tilt',
+    'perspective_warp', 'crop_pad', 'rgb_randomize',
+    'get_transforms', 'ImageDataBunch', 'ResizeMethod',
+    'imagenet_stats', 'cnn_learner', 'models', 'accuracy'
+]
+
+for func in mock_functions:
+    setattr(mock_fastai_vision, func, MagicMock(name=func))
+
+from functools import partial
+mock_fastai_vision.partial = partial
+
 import importlib.util
 
+spec = importlib.util.spec_from_file_location("get_preds", "get-preds.py")
+get_preds = importlib.util.module_from_spec(spec)
+sys.modules["get_preds"] = get_preds
+spec.loader.exec_module(get_preds)
+
 class TestGetPreds(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        # We need to temporarily mock heavy dependencies just for importing get-preds.py
-        # and then clean up to avoid polluting other tests
-        cls.original_modules = dict(sys.modules)
-
-        mock_fastai = MagicMock()
-        mock_fastai_vision = MagicMock()
-        mock_pandas = MagicMock()
-
-        sys.modules['fastai'] = mock_fastai
-        sys.modules['fastai.vision'] = mock_fastai_vision
-        sys.modules['pandas'] = mock_pandas
-
-        spec = importlib.util.spec_from_file_location("get_preds", "get-preds.py")
-        cls.get_preds = importlib.util.module_from_spec(spec)
-        sys.modules["get_preds"] = cls.get_preds
-
-        cls.get_preds.pd = mock_pandas
-        cls.get_preds.open_image = MagicMock()
-        cls.get_preds.Path = MagicMock()
-
-        spec.loader.exec_module(cls.get_preds)
-
-    @classmethod
-    def tearDownClass(cls):
-        # Restore original sys.modules to prevent global state pollution
-        to_remove = [k for k in sys.modules if k not in cls.original_modules]
-        for k in to_remove:
-            del sys.modules[k]
-        sys.modules.update(cls.original_modules)
-
-
     @patch('os.listdir')
+    @patch('get_preds.open_image', create=True)
+    @patch('pandas.DataFrame.to_csv')
+    @patch('os.chdir')
+    def test_save_preds(self, mock_chdir, mock_to_csv, mock_open_image, mock_listdir):
+        # Setup mock dependencies
+        mock_learn = MagicMock()
+        mock_data = MagicMock()
+        mock_data.classes = ['LS', 'FS', 'MS', 'CS', 'ECS']
+
+        # Mock predictions: probabilities for each class
+        mock_preds = MagicMock()
+        mock_preds.numpy.return_value = [0.1, 0.2, 0.5, 0.15, 0.05]
+        mock_learn.predict.return_value = (None, None, mock_preds)
+
+        mock_listdir.return_value = ['test1.jpg', 'test2.png', 'test3.txt']
+        mock_open_image.return_value = MagicMock()
+
+        # Call save_preds
+        path_img = '/fake/img/path'
+        get_preds.save_preds(mock_learn, mock_data, path_img)
+
+        # Verify chdir was called with path_img
+        mock_chdir.assert_called_with(path_img)
+
+        # Verify open_image was called for the image files only
+        self.assertEqual(mock_open_image.call_count, 2)
+        mock_open_image.assert_any_call('test1.jpg')
+        mock_open_image.assert_any_call('test2.png')
+
+        # Verify predict was called
+        self.assertEqual(mock_learn.predict.call_count, 2)
+
+        # Verify to_csv was called once to save preds.csv
+        self.assertEqual(mock_to_csv.call_count, 1)
+        args, kwargs = mock_to_csv.call_args
+        self.assertEqual(args[0], Path(path_img) / 'preds.csv')
+        self.assertEqual(kwargs.get('index'), False)
+
     @patch('os.path.exists')
     @patch('os.mkdir')
-    @patch('os.chdir')
-    def test_save_preds_with_path_preds(self, mock_chdir, mock_mkdir, mock_exists, mock_listdir):
-        mock_exists.return_value = False
-        mock_listdir.return_value = ['image1.jpg', 'image2.png', 'not_an_image.txt']
-
-        mock_learn = MagicMock()
-        mock_learn.predict.return_value = [None, None, MagicMock(numpy=MagicMock(return_value=[0.1, 0.2, 0.3, 0.4, 0.5]))]
-
-        mock_data = MagicMock()
-        mock_data.classes = ['LS', 'FS', 'MS', 'CS', 'ECS']
-
-        mock_df = MagicMock()
-        mock_df.sort_values.return_value = mock_df
-        mock_df.reset_index.return_value = mock_df
-        mock_df.head.return_value = mock_df
-
-        # Patch the pandas methods used in the module
-        with patch.object(self.get_preds.pd, 'DataFrame', return_value=mock_df) as mock_dataframe, \
-             patch.object(self.get_preds.pd, 'Categorical'), \
-             patch.object(self.get_preds.pd, 'concat') as mock_concat, \
-             patch.object(self.get_preds, 'open_image') as mock_open_image:
-
-            mock_bdf = MagicMock()
-            mock_concat.return_value = mock_bdf
-
-            self.get_preds.save_preds('/test/img/path', mock_learn, mock_data, '/test/preds/path')
-
-            mock_mkdir.assert_called_once_with('/test/preds/path')
-            mock_chdir.assert_called_once_with('/test/img/path')
-            self.assertEqual(mock_open_image.call_count, 2)
-            mock_learn.predict.assert_called()
-            mock_concat.assert_called_once()
-            mock_bdf.to_csv.assert_called_once()
-
     @patch('os.listdir')
+    @patch('get_preds.open_image', create=True)
+    @patch('pandas.DataFrame.to_csv')
     @patch('os.chdir')
-    def test_save_preds_without_path_preds(self, mock_chdir, mock_listdir):
-        mock_listdir.return_value = ['image1.jpg']
-
+    def test_save_preds_with_path_preds(self, mock_chdir, mock_to_csv, mock_open_image, mock_listdir, mock_mkdir, mock_exists):
         mock_learn = MagicMock()
-        mock_learn.predict.return_value = [None, None, MagicMock(numpy=MagicMock(return_value=[0.1, 0.2, 0.3, 0.4, 0.5]))]
-
         mock_data = MagicMock()
         mock_data.classes = ['LS', 'FS', 'MS', 'CS', 'ECS']
 
-        mock_df = MagicMock()
-        mock_df.sort_values.return_value = mock_df
-        mock_df.reset_index.return_value = mock_df
-        mock_df.head.return_value = mock_df
+        mock_preds = MagicMock()
+        mock_preds.numpy.return_value = [0.1, 0.2, 0.5, 0.15, 0.05]
+        mock_learn.predict.return_value = (None, None, mock_preds)
 
-        with patch.object(self.get_preds.pd, 'DataFrame', return_value=mock_df) as mock_dataframe, \
-             patch.object(self.get_preds.pd, 'Categorical'), \
-             patch.object(self.get_preds.pd, 'concat') as mock_concat, \
-             patch.object(self.get_preds, 'open_image') as mock_open_image, \
-             patch.object(self.get_preds, 'Path') as mock_path:
+        mock_exists.return_value = False
+        mock_listdir.return_value = ['test1.jpg']
 
-            mock_bdf = MagicMock()
-            mock_concat.return_value = mock_bdf
+        path_img = '/fake/img/path'
+        path_preds = '/fake/preds/path'
 
-            self.get_preds.save_preds('/test/img/path', mock_learn, mock_data, None)
+        get_preds.save_preds(mock_learn, mock_data, path_img, path_preds=path_preds)
 
-            mock_chdir.assert_called_once_with('/test/img/path')
-            self.assertEqual(mock_open_image.call_count, 1)
-            mock_learn.predict.assert_called()
-            mock_concat.assert_called_once()
-            mock_bdf.to_csv.assert_called_once()
+        # Verify mkdir was called because exists returned False
+        mock_mkdir.assert_called_once_with(path_preds)
 
+        # Verify to_csv was called with path_preds
+        self.assertEqual(mock_to_csv.call_count, 1)
+        args, kwargs = mock_to_csv.call_args
+        self.assertEqual(args[0], Path(path_preds) / 'preds.csv')
 
 if __name__ == '__main__':
     unittest.main()
