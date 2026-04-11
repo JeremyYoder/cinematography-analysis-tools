@@ -1,0 +1,3 @@
+## 2024-05-24 - Matplotlib Object Creation Overhead in Loops
+**Learning:** In scripts like `get-heatmaps.py` that dynamically generate numerous visualizations using `matplotlib` inside iterative loops, repeatedly instantiating `Figure` and `Axes` objects (e.g., via `plt.subplots()`) causes severe performance bottlenecks and memory accumulation.
+**Action:** Always initialize Matplotlib's `Figure` and `Axes` objects once outside the generation loop. Reuse the objects across iterations by calling `ax.clear()` to discard the previous plot data, and safely dispose of the reference with `plt.close(fig)` when the entire loop has completed.
