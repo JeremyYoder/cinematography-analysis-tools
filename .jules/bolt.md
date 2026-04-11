@@ -1,0 +1,3 @@
+## 2024-05-24 - Optimize Matplotlib Figure Creation in Loops
+**Learning:** In scripts that iterate through images and generate plots (like `get-heatmaps.py`), repeatedly calling `plt.subplots()` inside the loop introduces a massive overhead due to the continuous creation and garbage collection of Figure and Axes objects. This creates significant performance degradation and potential memory leaks.
+**Action:** When saving multiple images or heatmaps in a loop, initialize the Figure and Axes objects once *outside* the loop (e.g., `fig, ax = plt.subplots(...)`). Pass these objects into the saving functions and reuse them by calling `ax.clear()` for each iteration. Finally, call `plt.close(fig)` outside the loop to clean up.

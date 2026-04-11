@@ -25,6 +25,7 @@ class TestGetHeatmaps(unittest.TestCase):
         sys.modules['fastai.callbacks.hooks'] = mock_fastai_callbacks_hooks
         sys.modules['matplotlib'] = mock_matplotlib
         sys.modules['matplotlib.ticker'] = mock_matplotlib_ticker
+        mock_matplotlib_pyplot.subplots.return_value = (MagicMock(), MagicMock())
         sys.modules['matplotlib.pyplot'] = mock_matplotlib_pyplot
 
         # Load get-heatmaps.py
@@ -62,8 +63,10 @@ class TestGetHeatmaps(unittest.TestCase):
              patch.object(self.get_heatmaps.ImageDataBunch, 'from_folder') as mock_from_folder, \
              patch.object(self.get_heatmaps, 'hooked_backward') as mock_hooked_backward, \
              patch.object(self.get_heatmaps, 'save_img') as mock_save_img, \
-             patch.object(self.get_heatmaps, 'show_heatmap') as mock_show_heatmap:
+             patch.object(self.get_heatmaps, 'show_heatmap') as mock_show_heatmap, \
+             patch.object(self.get_heatmaps.plt, 'subplots') as mock_subplots:
 
+            mock_subplots.return_value = (MagicMock(), MagicMock())
             mock_path_mod.exists.return_value = False
             mock_listdir.return_value = ['img1.jpg', 'img2.png']
 
@@ -87,7 +90,14 @@ class TestGetHeatmaps(unittest.TestCase):
             mock_hook_a.stored[0].cpu.return_value.mean.return_value = 'avg_acts'
             mock_hooked_backward.return_value = (mock_hook_a, MagicMock())
 
-            self.get_heatmaps.generate_heatmaps('/base', '/img', '/hms', 0.8)
+            with patch('argparse.ArgumentParser.parse_args') as mock_parse_args:
+                mock_args = MagicMock()
+                mock_args.path_base = '/base'
+                mock_args.path_img = '/img'
+                mock_args.path_hms = '/hms'
+                mock_args.alpha = 0.8
+                mock_parse_args.return_value = mock_args
+                self.get_heatmaps.main()
 
             mock_get_model_data.assert_called_once()
             self.assertEqual(mock_save_img.call_count, 2)
