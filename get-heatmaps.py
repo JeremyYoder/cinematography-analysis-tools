@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import torch
 import matplotlib.pyplot as plt
@@ -83,6 +84,15 @@ def main():
     path_img = args.path_img
     path_hms = args.path_hms
     alpha    = args.alpha
+
+    if not os.path.exists(path_img) or not os.path.isdir(path_img):
+        print(f"Error: Directory '{path_img}' does not exist or is not a directory.")
+        sys.exit(1)
+
+    has_images = any(f.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'] for f in Path(path_img).rglob('*') if f.is_file())
+    if not has_images:
+        print(f"No images found in '{path_img}' or its subdirectories. Please check the directory and try again.")
+        sys.exit(0)
 
     ###############################################################################
     ##############################  SETUP  ########################################

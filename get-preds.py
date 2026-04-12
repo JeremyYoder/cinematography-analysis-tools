@@ -8,6 +8,7 @@ import warnings
 import os
 import pandas as pd
 from pathlib import Path
+import sys
 
 warnings.filterwarnings('ignore', '.*default behavior*', )
 warnings.filterwarnings('ignore', '.*torch.solve*', )
@@ -82,6 +83,15 @@ if __name__ == '__main__':
     path = args.path_base
     path_img = args.path_img
     path_preds = args.path_preds
+
+    if not os.path.exists(path_img) or not os.path.isdir(path_img):
+        print(f"Error: Directory '{path_img}' does not exist or is not a directory.")
+        sys.exit(1)
+
+    has_images = any(f.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'] for f in Path(path_img).rglob('*') if f.is_file())
+    if not has_images:
+        print(f"No images found in '{path_img}' or its subdirectories. Please check the directory and try again.")
+        sys.exit(0)
 
     learn, data = get_model_data(Path(path))
     learn = learn.to_fp32()
