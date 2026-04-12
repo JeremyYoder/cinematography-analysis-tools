@@ -83,6 +83,12 @@ if __name__ == '__main__':
     path_img = args.path_img
     path_preds = args.path_preds
 
+    files = [f for f in os.listdir(path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
+    if not files:
+        print(f"No valid image files found in '{path_img}'. Exiting.")
+        import sys
+        sys.exit(0)
+
     learn, data = get_model_data(Path(path))
     learn = learn.to_fp32()
 

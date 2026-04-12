@@ -52,7 +52,7 @@ class TestGetHeatmaps(unittest.TestCase):
             del sys.modules[k]
         sys.modules.update(cls.original_modules)
 
-    def test_generate_heatmaps(self):
+    def test_main_generates_heatmaps(self):
         with patch.object(self.get_heatmaps.os, 'path') as mock_path_mod, \
              patch.object(self.get_heatmaps.os, 'listdir') as mock_listdir, \
              patch.object(self.get_heatmaps.os, 'mkdir') as mock_mkdir, \
@@ -62,10 +62,16 @@ class TestGetHeatmaps(unittest.TestCase):
              patch.object(self.get_heatmaps.ImageDataBunch, 'from_folder') as mock_from_folder, \
              patch.object(self.get_heatmaps, 'hooked_backward') as mock_hooked_backward, \
              patch.object(self.get_heatmaps, 'save_img') as mock_save_img, \
-             patch.object(self.get_heatmaps, 'show_heatmap') as mock_show_heatmap:
+             patch.object(self.get_heatmaps, 'show_heatmap') as mock_show_heatmap, \
+             patch.object(self.get_heatmaps.plt, 'subplots') as mock_subplots, \
+             patch('sys.argv', ['get-heatmaps.py', '--path_base', '/base', '--path_img', '/img', '--path_hms', '/hms', '--alpha', '0.8']):
 
             mock_path_mod.exists.return_value = False
             mock_listdir.return_value = ['img1.jpg', 'img2.png']
+
+            mock_fig = MagicMock()
+            mock_ax = MagicMock()
+            mock_subplots.return_value = (mock_fig, mock_ax)
 
             mock_learn = MagicMock()
             mock_learn.to_fp32.return_value = mock_learn
@@ -87,14 +93,20 @@ class TestGetHeatmaps(unittest.TestCase):
             mock_hook_a.stored[0].cpu.return_value.mean.return_value = 'avg_acts'
             mock_hooked_backward.return_value = (mock_hook_a, MagicMock())
 
-            self.get_heatmaps.generate_heatmaps('/base', '/img', '/hms', 0.8)
+            self.get_heatmaps.main()
 
             mock_get_model_data.assert_called_once()
             self.assertEqual(mock_save_img.call_count, 2)
             self.assertEqual(mock_show_heatmap.call_count, 2)
+
+            # Assert arguments to save_img and show_heatmap include fig and ax
+            mock_save_img.assert_any_call('x1', self.get_heatmaps.Path('/hms'), 'y1', 0, mock_fig, mock_ax)
+
             mock_rmtree.assert_called_once()
             self.assertTrue(mock_mkdir.called)
             self.assertTrue(mock_rename.called)
+
+            mock_subplots.assert_called_once_with(figsize=(5,3))
 
 if __name__ == '__main__':
     unittest.main()

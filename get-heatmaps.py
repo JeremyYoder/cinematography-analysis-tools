@@ -19,34 +19,28 @@ def hooked_backward(m, xb, y):
             preds[0,int(y)].backward()
     return hook_a,hook_g
 
-def show_heatmap(xb_im, hm, path, y, idx, only_heatmap=False, interpolation='bilinear', alpha=0.5):
-    _,ax = plt.subplots(figsize=(5,3))
-
-    plt.gca().set_axis_off()
-    plt.gca().xaxis.set_major_locator(NullLocator())
-    plt.gca().yaxis.set_major_locator(NullLocator())
+def show_heatmap(xb_im, hm, path, y, idx, fig, ax, only_heatmap=False, interpolation='bilinear', alpha=0.5):
+    ax.clear()
+    ax.set_axis_off()
+    ax.xaxis.set_major_locator(NullLocator())
+    ax.yaxis.set_major_locator(NullLocator())
 
     if not only_heatmap: xb_im.show(ax)
     ax.imshow(hm, alpha=alpha, extent=(0,666,375,0),
               interpolation=interpolation, cmap='YlOrRd')
     fname = f'{str(y)}_{str(idx+1)}_heatmap.png'
-    plt.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
+    fig.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
 
-    plt.close()
-    plt.close('all')
+def save_img(img, path, y, idx, fig, ax):
+    ax.clear()
+    img.show(ax)
 
-def save_img(img, path, y, idx):
-    img.show(figsize = (5,3))
-
-    plt.gca().set_axis_off()
-    plt.gca().xaxis.set_major_locator(NullLocator())
-    plt.gca().yaxis.set_major_locator(NullLocator())
+    ax.set_axis_off()
+    ax.xaxis.set_major_locator(NullLocator())
+    ax.yaxis.set_major_locator(NullLocator())
 
     fname = f'{str(y)}_{str(idx+1)}.png'
-    plt.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
-
-    plt.close()
-    plt.close('all')
+    fig.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -85,18 +79,6 @@ def main():
     alpha    = args.alpha
 
     ###############################################################################
-    ##############################  SETUP  ########################################
-    ###############################################################################
-
-    learn, data = get_model_data(Path(path))
-
-    learn = learn.to_fp32()
-
-    m = learn.model.eval()
-
-    ###############################################################################
-
-    ###############################################################################
     ########################## GENERATING HEATMAPS ################################
     ###############################################################################
 
@@ -107,6 +89,22 @@ def main():
         path_hms = path_img
 
     files = [f for f in os.listdir(path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
+
+    if not files:
+        print(f"No valid image files found in '{path_img}'. Exiting.")
+        return
+
+    ###############################################################################
+    ##############################  SETUP  ########################################
+    ###############################################################################
+
+    learn, data = get_model_data(Path(path))
+
+    learn = learn.to_fp32()
+
+    m = learn.model.eval()
+
+    ###############################################################################
 
     # creating the required directories where needed
     # a dummy `ImageDataBunch` needs to be created to generate heatmaps
@@ -129,6 +127,8 @@ def main():
                                           num_workers = 0
                                          ).normalize(imagenet_stats)
         # heatmap generation
+        # Initialize Matplotlib Figure and Axes once to avoid overhead in the loop
+        fig, ax = plt.subplots(figsize=(5,3))
         for idx in range(len(temp.train_ds)):
             x,y = temp.train_ds[idx]
             print(f'# {idx+1} / {len(temp.train_ds)}')
@@ -140,8 +140,8 @@ def main():
             acts  = hook_a.stored[0].cpu()
             avg_acts = acts.mean(0)
 
-            save_img(x, path_hms, y, idx)
-            show_heatmap(xb_im, avg_acts, path_hms, y, idx, only_heatmap=False, interpolation='spline16', alpha=alpha)
+            save_img(x, path_hms, y, idx, fig, ax)
+            show_heatmap(xb_im, avg_acts, path_hms, y, idx, fig, ax, only_heatmap=False, interpolation='spline16', alpha=alpha)
 
     finally:
         # deleting dummy directories and moving back files to where they were
