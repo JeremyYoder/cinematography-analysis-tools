@@ -1,4 +1,7 @@
-from fastai.vision import *
+from fastai.vision import (
+    cutout, jitter, skew, squish, tilt, perspective_warp, crop_pad, rgb_randomize,
+    get_transforms, ImageDataBunch, ResizeMethod, imagenet_stats, cnn_learner, models, accuracy
+)
 from pathlib import Path
 from functools import partial
 
