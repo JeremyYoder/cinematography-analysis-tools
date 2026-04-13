@@ -13,51 +13,41 @@ warnings.filterwarnings('ignore', '.*default behavior*', )
 warnings.filterwarnings('ignore', '.*torch.solve*', )
 
 def save_preds(learn, data, path_img, path_preds=None):
-    path_img = validate_path(path_img, check_exists=True)
-
     if path_preds is not None:
-        path_preds = validate_path(path_preds)
         os.mkdir(path_preds) if not os.path.exists(path_preds) else None
 
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
 
-    bdf_list = []
-    hierarchy = ['LS', 'FS', 'MS', 'CS', 'ECS']
+    print(f"Found {len(files)} images to process.")
 
-    for file in files:
+    bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
+
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
+
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # Determine best prediction efficiently using native python
-        best_class_idx = -1
-        best_prob = -1.0
-        best_class = None
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
-        for idx, (cls, prob) in enumerate(zip(data.classes, preds_num)):
-            if prob > best_prob or (prob == best_prob and (best_class is None or hierarchy.index(cls) < hierarchy.index(best_class))):
-                best_prob = prob
-                best_class = cls
-                best_class_idx = idx
-
-        # Convert to percentage
-        best_prob *= 100
-
-        # Append as a dict
         bdf_list.append({
-            'shot-type': best_class,
-            'prediction': best_prob,
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
             'shot': str(file)
         })
 
     if bdf_list:
         bdf = pd.DataFrame(bdf_list)
     else:
-        bdf = pd.DataFrame()
+        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
 
     bdfname = "preds.csv"
     if path_preds is not None:
@@ -89,7 +79,7 @@ if __name__ == '__main__':
                         help="path where you'd like to store the predictions")
     args = parser.parse_args()
 
-    path = validate_path(args.path_base, check_exists=True)
+    path = args.path_base
     path_img = args.path_img
     path_preds = args.path_preds
 

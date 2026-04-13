@@ -1,22 +1,6 @@
 from fastai.vision import *
 from pathlib import Path
-import os
-
-def validate_path(p, check_exists=False):
-    path = Path(p).resolve()
-
-    # Reject paths containing '..'
-    if '..' in str(p):
-        raise ValueError("Path traversal detected")
-
-    # Reject paths targeting root or its immediate children
-    if str(path) == '/' or str(path.parent) == '/':
-        raise ValueError("Invalid path: Root filesystem access denied")
-
-    if check_exists and not path.exists():
-        raise FileNotFoundError(f"Path does not exist: {path}")
-
-    return path
+from functools import partial
 
 # Data Augmentations
 
