@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 Cinematic AI — Browser Native Shot Classifier</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Load ONNX Runtime Web via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Shot Type Classifier</h1>
+            <p class="subtitle">Edge AI: Precise cinematic classification running natively in your browser.</p>
+        </header>
+
+        <main>
+            <div class="upload-card" id="drop-zone">
+                <div class="loading-overlay" id="loader">
+                    <div class="spinner"></div>
+                </div>
+                <span class="drop-icon">🎬</span>
+                <p>Drag & Drop a movie frame or <strong>Click to Browse</strong></p>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 1rem;">
+                    ResNet-50 &bull; ONNX Runtime &bull; Zero Server Latency
+                </p>
+                <input type="file" id="file-input" accept="image/*">
+            </div>
+
+            <div class="results-container" id="results">
+                <div class="preview-box">
+                    <img id="preview-img" alt="Preview">
+                </div>
+
+                <div class="stats-box">
+                    <!-- LS -->
+                    <div class="shot-row">
+                        <div class="shot-info">
+                            <span>LS &bull; LONG SHOT</span>
+                            <span id="p-LS">0%</span>
+                        </div>
+                        <div class="progress-bg">
+                            <div class="progress-fill" id="bar-LS" style="background-color: var(--ls-color);"></div>
+                        </div>
+                    </div>
+
+                    <!-- FS -->
+                    <div class="shot-row">
+                        <div class="shot-info">
+                            <span>FS &bull; FULL SHOT</span>
+                            <span id="p-FS">0%</span>
+                        </div>
+                        <div class="progress-bg">
+                            <div class="progress-fill" id="bar-FS" style="background-color: var(--fs-color);"></div>
+                        </div>
+                    </div>
+
+                    <!-- MS -->
+                    <div class="shot-row">
+                        <div class="shot-info">
+                            <span>MS &bull; MEDIUM SHOT</span>
+                            <span id="p-MS">0%</span>
+                        </div>
+                        <div class="progress-bg">
+                            <div class="progress-fill" id="bar-MS" style="background-color: var(--ms-color);"></div>
+                        </div>
+                    </div>
+
+                    <!-- CS -->
+                    <div class="shot-row">
+                        <div class="shot-info">
+                            <span>CS &bull; CLOSE SHOT</span>
+                            <span id="p-CS">0%</span>
+                        </div>
+                        <div class="progress-bg">
+                            <div class="progress-fill" id="bar-CS" style="background-color: var(--cs-color);"></div>
+                        </div>
+                    </div>
+
+                    <!-- ECS -->
+                    <div class="shot-row">
+                        <div class="shot-info">
+                            <span>ECS &bull; EXTREME CLOSE SHOT</span>
+                            <span id="p-ECS">0%</span>
+                        </div>
+                        <div class="progress-bg">
+                            <div class="progress-fill" id="bar-ECS" style="background-color: var(--ecs-color);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
