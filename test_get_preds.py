@@ -33,11 +33,10 @@ sys.modules["get_preds"] = get_preds
 spec.loader.exec_module(get_preds)
 
 class TestGetPreds(unittest.TestCase):
-    @patch('os.listdir')
+    @patch('get_preds.Path.rglob')
     @patch('get_preds.open_image', create=True)
     @patch('pandas.DataFrame.to_csv')
-    @patch('os.chdir')
-    def test_save_preds(self, mock_chdir, mock_to_csv, mock_open_image, mock_listdir):
+    def test_save_preds(self, mock_to_csv, mock_open_image, mock_rglob):
         # Setup mock dependencies
         mock_learn = MagicMock()
         mock_data = MagicMock()
@@ -48,20 +47,32 @@ class TestGetPreds(unittest.TestCase):
         mock_preds.numpy.return_value = [0.1, 0.2, 0.5, 0.15, 0.05]
         mock_learn.predict.return_value = (None, None, mock_preds)
 
-        mock_listdir.return_value = ['test1.jpg', 'test2.png', 'test3.txt']
+        mock_file1 = MagicMock()
+        mock_file1.relative_to.return_value = 'test1.jpg'
+        mock_file1.is_file.return_value = True
+        mock_file1.suffix.lower.return_value = '.jpg'
+
+        mock_file2 = MagicMock()
+        mock_file2.relative_to.return_value = 'test2.png'
+        mock_file2.is_file.return_value = True
+        mock_file2.suffix.lower.return_value = '.png'
+
+        mock_file3 = MagicMock()
+        mock_file3.relative_to.return_value = 'test3.txt'
+        mock_file3.is_file.return_value = True
+        mock_file3.suffix.lower.return_value = '.txt'
+
+        mock_rglob.return_value = [mock_file1, mock_file2, mock_file3]
         mock_open_image.return_value = MagicMock()
 
         # Call save_preds
         path_img = '/fake/img/path'
         get_preds.save_preds(mock_learn, mock_data, path_img)
 
-        # Verify chdir was called with path_img
-        mock_chdir.assert_called_with(path_img)
-
         # Verify open_image was called for the image files only
         self.assertEqual(mock_open_image.call_count, 2)
-        mock_open_image.assert_any_call('test1.jpg')
-        mock_open_image.assert_any_call('test2.png')
+        mock_open_image.assert_any_call(mock_file1)
+        mock_open_image.assert_any_call(mock_file2)
 
         # Verify predict was called
         self.assertEqual(mock_learn.predict.call_count, 2)
@@ -72,13 +83,11 @@ class TestGetPreds(unittest.TestCase):
         self.assertEqual(args[0], Path(path_img) / 'preds.csv')
         self.assertEqual(kwargs.get('index'), False)
 
-    @patch('os.path.exists')
-    @patch('os.mkdir')
-    @patch('os.listdir')
+    @patch('get_preds.Path.mkdir')
+    @patch('get_preds.Path.rglob')
     @patch('get_preds.open_image', create=True)
     @patch('pandas.DataFrame.to_csv')
-    @patch('os.chdir')
-    def test_save_preds_with_path_preds(self, mock_chdir, mock_to_csv, mock_open_image, mock_listdir, mock_mkdir, mock_exists):
+    def test_save_preds_with_path_preds(self, mock_to_csv, mock_open_image, mock_rglob, mock_mkdir):
         mock_learn = MagicMock()
         mock_data = MagicMock()
         mock_data.classes = ['LS', 'FS', 'MS', 'CS', 'ECS']
@@ -87,16 +96,19 @@ class TestGetPreds(unittest.TestCase):
         mock_preds.numpy.return_value = [0.1, 0.2, 0.5, 0.15, 0.05]
         mock_learn.predict.return_value = (None, None, mock_preds)
 
-        mock_exists.return_value = False
-        mock_listdir.return_value = ['test1.jpg']
+        mock_file1 = MagicMock()
+        mock_file1.relative_to.return_value = 'test1.jpg'
+        mock_file1.is_file.return_value = True
+        mock_file1.suffix.lower.return_value = '.jpg'
+        mock_rglob.return_value = [mock_file1]
 
         path_img = '/fake/img/path'
         path_preds = '/fake/preds/path'
 
         get_preds.save_preds(mock_learn, mock_data, path_img, path_preds=path_preds)
 
-        # Verify mkdir was called because exists returned False
-        mock_mkdir.assert_called_once_with(path_preds)
+        # Verify mkdir was called
+        mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
         # Verify to_csv was called with path_preds
         self.assertEqual(mock_to_csv.call_count, 1)
