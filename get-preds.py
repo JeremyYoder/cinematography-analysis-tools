@@ -19,37 +19,35 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
+
+    print(f"Found {len(files)} images to process.")
 
     bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-    # Pre-define hierarchy map for fast lookup during tie-breaking
-    # Order: largest to smallest shot size
-    shot_hierarchy = ['LS', 'FS', 'MS', 'CS', 'ECS']
-    hierarchy_map = {shot: i for i, shot in enumerate(shot_hierarchy)}
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
 
-    for file in files:
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # extract predictions and find the best match using max()
-        # if probabilities are tied, it uses the lowest hierarchy index
-        # which corresponds to the largest shot size
-        preds = list(zip(data.classes, preds_num))
-        best_shot, best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
-        # Append to standard Python list to avoid DataFrame instantiation in loops
         bdf_list.append({
-            'shot-type': best_shot,
-            'prediction': best_pred * 100,
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
             'shot': str(file)
         })
 
-    # Instantiate the DataFrame once at the end
-    bdf = pd.DataFrame(bdf_list) if bdf_list else pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
+    if bdf_list:
+        bdf = pd.DataFrame(bdf_list)
+    else:
+        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
 
     bdfname = "preds.csv"
     if path_preds is not None:
