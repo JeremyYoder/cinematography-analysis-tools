@@ -19,32 +19,28 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
 
-    # Optimization: To maximize performance, we avoid iterative pandas DataFrame
-    # creation and sorting inside the loop. Instead, we use native Python operations
-    # to find the best prediction per file and instantiate a single consolidated
-    # DataFrame at the end.
-    shot_type_order = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
+    print(f"Found {len(files)} images to process.")
 
     bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-    for file in files:
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
+
         # open file
         x = open_image(file)
 
         # get preds
-        # In environments where .numpy() output is mocked as standard Python lists,
-        # we index it normally.
         preds_num = learn.predict(x)[2].numpy()
 
-        # max() with tuple: primary key is prediction, secondary key is -order
-        # to respect the tie-breaking hierarchy 'LS' > 'FS' > 'MS' > 'CS' > 'ECS'
-        best_idx = max(range(len(data.classes)), key=lambda i: (preds_num[i], -shot_type_order.get(data.classes[i], 99)))
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
         bdf_list.append({
-            'shot-type': data.classes[best_idx],
-            'prediction': preds_num[best_idx] * 100.0,
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
             'shot': str(file)
         })
 
