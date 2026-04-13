@@ -1,0 +1,3 @@
+## 2025-04-10 - CLI Developer Experience
+**Learning:** For command-line tools processing multiple files (like `get-preds.py`), printing a raw dump of files (e.g. `print(files)`) creates poor Developer Experience and pollutes the console, especially with large datasets. Additionally, lacking progress indicators during long synchronous operations makes the process opaque.
+**Action:** Replace raw file list dumps with summary counts (`Found X images`), ensure empty states are handled gracefully with early returns, and use simple `enumerate` loops to print clear progress indicators (`Processing idx/total`).
