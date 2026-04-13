@@ -155,7 +155,89 @@ def extract_frames(
     frames = sorted(output_dir.glob("frame_*.jpg"))
     print(f"  ✅ Extracted {len(frames)} frames")
 
-    return frames
+def stream_frames(
+    video_path: Path,
+    sample_rate: float = 2.0,
+    max_frames: Optional[int] = None,
+):
+    """Extract frames from a video in-memory via FFmpeg stdout pipeline.
+
+    Args:
+        video_path: Path to the input video file.
+        sample_rate: Frames per second to extract.
+        max_frames: Maximum number of frames to yield.
+
+    Yields:
+        Tuple of (frame_normalized_time_in_seconds, numpy_image_array_rgb24)
+    """
+    import numpy as np
+    
+    if not check_ffmpeg():
+        raise RuntimeError(
+            "FFmpeg is required but not found.\n"
+            "Install with: brew install ffmpeg (macOS) or apt install ffmpeg (Linux)"
+        )
+
+    video_path = Path(video_path)
+    if not video_path.exists():
+        raise FileNotFoundError(f"Video not found: {video_path}")
+
+    info = get_video_info(video_path)
+    width, height = info["width"], info["height"]
+    
+    if width == 0 or height == 0:
+        raise ValueError("Invalid video resolution.")
+
+    # Calculate frame size for RGB24
+    frame_size = width * height * 3
+
+    cmd = [
+        "ffmpeg",
+        "-i", str(video_path),
+        "-vf", f"fps={sample_rate}",
+        "-f", "image2pipe",
+        "-vcodec", "rawvideo",
+        "-pix_fmt", "rgb24",
+        "-vsync", "vfr",
+    ]
+
+    if max_frames is not None:
+        cmd.extend(["-frames:v", str(max_frames)])
+
+    cmd.append("-")  # Pipe output to stdout
+
+    print(f"Streaming in-memory frames from {video_path.name}...")
+    print(f"  Resolution: {width}x{height} | Target: {sample_rate} fps")
+
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        bufsize=10**8  # Large buffer for raw video arrays
+    )
+
+    frame_idx = 0
+    try:
+        while True:
+            # Read exactly one frame
+            raw_bytes = process.stdout.read(frame_size)
+            if not raw_bytes or len(raw_bytes) != frame_size:
+                break
+                
+            frame_arr = np.frombuffer(raw_bytes, dtype=np.uint8).reshape((height, width, 3))
+            
+            timestamp = frame_idx / sample_rate
+            yield timestamp, frame_arr
+            
+            frame_idx += 1
+            if max_frames is not None and frame_idx >= max_frames:
+                break
+    finally:
+        process.stdout.close()
+        process.kill()
+        process.wait()
+        
+    print(f"  ✅ Extracted {frame_idx} in-memory frames")
 
 
 def extract_frame_at_time(
@@ -163,16 +245,7 @@ def extract_frame_at_time(
     timestamp: float,
     output_path: Path,
 ) -> Path:
-    """Extract a single frame at a specific timestamp.
-
-    Args:
-        video_path: Path to the input video.
-        timestamp: Time in seconds.
-        output_path: Path to save the extracted frame.
-
-    Returns:
-        Path to the extracted frame.
-    """
+    """Extract a single frame at a specific timestamp [Legacy Disk Method]."""
     cmd = [
         "ffmpeg", "-y",
         "-ss", str(timestamp),

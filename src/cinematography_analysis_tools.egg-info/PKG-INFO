@@ -24,6 +24,9 @@ Requires-Dist: numpy>=1.19
 Requires-Dist: Pillow>=8.0
 Requires-Dist: scikit-learn>=0.24
 Requires-Dist: requests>=2.20
+Requires-Dist: fastapi>=0.80
+Requires-Dist: uvicorn>=0.15
+Requires-Dist: onnx>=1.10
 Provides-Extra: spaces
 Requires-Dist: gradio>=4.0; extra == "spaces"
 Provides-Extra: dev

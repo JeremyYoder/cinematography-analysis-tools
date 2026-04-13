@@ -105,7 +105,7 @@ def lab_to_rgb(lab: np.ndarray) -> np.ndarray:
 
 
 def extract_palette(
-    image_path: Path,
+    image: Path | str | Image.Image | np.ndarray,
     n_colors: int = 5,
     sample_size: int = 10000,
     max_iterations: int = 50,
@@ -113,7 +113,7 @@ def extract_palette(
     """Extract a dominant color palette from an image using K-means in CIELAB space.
 
     Args:
-        image_path: Path to the image file.
+        image: Path to the image file, PIL Image, or numpy array.
         n_colors: Number of dominant colors to extract.
         sample_size: Number of pixels to sample for clustering.
         max_iterations: Maximum K-means iterations.
@@ -124,8 +124,14 @@ def extract_palette(
     """
     from sklearn.cluster import KMeans
 
-    img = Image.open(image_path).convert("RGB")
-    pixels = np.array(img).reshape(-1, 3)
+    if isinstance(image, (Path, str)):
+        img = Image.open(str(image)).convert("RGB")
+        pixels = np.array(img).reshape(-1, 3)
+    elif isinstance(image, Image.Image):
+        pixels = np.array(image.convert("RGB")).reshape(-1, 3)
+    else:
+        # Assume numpy array
+        pixels = np.asarray(image).reshape(-1, 3)
 
     # Subsample for performance
     if len(pixels) > sample_size:

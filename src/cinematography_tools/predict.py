@@ -25,22 +25,28 @@ warnings.filterwarnings("ignore", ".*default behavior*")
 HIERARCHY_MAP = {"LS": 0, "FS": 1, "MS": 2, "CS": 3, "ECS": 4}
 
 
-def predict_image(model: torch.nn.Module, image_path: Path) -> Dict:
+def predict_image(model: torch.nn.Module, image: Path | str | Image.Image) -> Dict:
     """Predict the shot type of a single image using pure PyTorch.
 
     Args:
         model: PyTorch ResNet50 classifier.
-        image_path: Path to the image file.
+        image: Path to the image file, or an opened PIL Image.
 
     Returns:
-        Dict with keys: shot_type, confidence, all_predictions.
+        Dict with keys: shot_type, confidence, all_predictions, file (if applicable).
     """
     from .transforms import get_inference_transforms
     
     device = next(model.parameters()).device
     tfms = get_inference_transforms()
     
-    img = Image.open(str(image_path)).convert("RGB")
+    if isinstance(image, (Path, str)):
+        img = Image.open(str(image)).convert("RGB")
+        file_name = str(image)
+    else:
+        img = image.convert("RGB")
+        file_name = "in-memory"
+        
     tensor = tfms(img).unsqueeze(0).to(device)
     
     with torch.no_grad():
@@ -57,7 +63,7 @@ def predict_image(model: torch.nn.Module, image_path: Path) -> Dict:
         "shot_type": best[0],
         "confidence": best[1],
         "all_predictions": {cls: conf for cls, conf in all_preds},
-        "file": str(image_path),
+        "file": file_name,
     }
 
 

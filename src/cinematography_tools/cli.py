@@ -40,72 +40,83 @@ def cmd_heatmap(args):
 
 
 def cmd_analyze_video(args):
-    """Analyze a video file end-to-end."""
-    import tempfile
-
-    from .color import extract_palettes_batch
-    from .predict import predict_batch
+    """Analyze a video file sequentially using zero-IO streaming."""
+    import pandas as pd
+    from PIL import Image
+    from .color import extract_palette
+    from .predict import predict_image
     from .timeline import build_timeline, generate_summary, visualize_timeline
     from .utils import ensure_directory
-    from .video import extract_frames, get_video_info
+    from .video import stream_frames, get_video_info
 
     video_path = Path(args.input)
     output_dir = ensure_directory(Path(args.output))
 
-    print(f"🎬 Analyzing: {video_path.name}")
+    print(f"🎬 Streaming Analysis: {video_path.name}")
     print("=" * 60)
 
-    # Step 1: Get video metadata
     info = get_video_info(video_path)
     print(f"  Video: {info['width']}x{info['height']} @ {info['fps']:.1f}fps")
     print(f"  Duration: {info['duration']:.1f}s | Codec: {info['codec']}")
     print()
 
-    # Step 2: Extract frames
-    frames_dir = ensure_directory(output_dir / "frames")
-    print("Step 1/4: Extracting frames...")
-    frames = extract_frames(
-        video_path, frames_dir,
-        sample_rate=args.sample_rate,
-        max_frames=args.max_frames,
-    )
+    from .model import load_model
+    path_base_obj = Path(args.model_path) if args.model_path else None
+    model, _ = load_model(path_base_obj)
 
-    if not frames:
+    # Initialize storage
+    predictions_list = []
+    palettes = []
+    frames_extracted = 0
+
+    # Number of frames to trigger a palette extraction (roughly ~50 palettes total)
+    expected_frames = int(info["duration"] * args.sample_rate)
+    palette_interval = max(1, expected_frames // 50)
+
+    print("Step 1/2: In-Memory Streaming & Classification...")
+    for timestamp, frame_arr in stream_frames(video_path, args.sample_rate, args.max_frames):
+        # frame_arr is rgb24 numpy array. Convert to PIL for predict pipeline
+        img = Image.fromarray(frame_arr)
+        
+        # Predict shot type
+        result = predict_image(model, img)
+        predictions_list.append({
+            "shot-type": result["shot_type"],
+            "prediction": result["confidence"],
+            "timestamp": timestamp,
+        })
+        
+        # Color extraction
+        if frames_extracted % palette_interval == 0:
+            pal = extract_palette(frame_arr, n_colors=args.colors)
+            palettes.append({
+                "timestamp": timestamp,
+                "palette": pal,
+            })
+            
+        frames_extracted += 1
+
+    if not predictions_list:
         print("No frames extracted. Exiting.")
         return
 
-    # Step 3: Classify frames
-    print("\nStep 2/4: Classifying shot types...")
-    from .model import load_model
-
-    path_base_obj = Path(args.model_path) if args.model_path else None
-    learn, data = load_model(path_base_obj)
-    learn = learn.to_fp32()
-
-    predictions = predict_batch(
-        learn, data, frames_dir,
-        output_path=output_dir / "predictions.csv",
-    )
-
-    # Step 4: Extract color palettes
-    print("\nStep 3/4: Extracting color palettes (CIELAB)...")
-    # Sample subset of frames for palette to keep it fast
-    palette_sample = frames[::max(1, len(frames) // 50)]  # ~50 samples max
-    palettes = extract_palettes_batch(palette_sample, n_colors=args.colors)
-
-    # Save palettes
+    # Convert predictions to DataFrame
+    predictions = pd.DataFrame(predictions_list)
+    predictions.to_csv(output_dir / "predictions.csv", index=False)
+    
     import json
     with open(output_dir / "palettes.json", "w") as f:
         json.dump(palettes, f, indent=2)
-    print(f"  ✅ Palettes saved ({len(palettes)} frames sampled)")
 
-    # Step 5: Build timeline and visualize
-    print("\nStep 4/4: Building timeline...")
-    timeline = build_timeline(frames, predictions, args.sample_rate, info["duration"])
+    print(f"  ✅ Extracted {frames_extracted} frames directly into memory")
+
+    print("\nStep 2/2: Building timeline...")
+    # build_timeline in timeline.py expects the dataframe to just have 'prediction' and 'shot-type' 
+    # but we provided timestamp directly. Let's pass empty frames list.
+    timeline = build_timeline([], predictions, args.sample_rate, info["duration"])
     timeline.to_csv(output_dir / "timeline.csv", index=False)
     print(f"  ✅ Timeline: {len(timeline)} shots detected")
 
-    # Generate visualization
     visualize_timeline(
         timeline,
         output_dir / "timeline.png",
@@ -114,14 +125,12 @@ def cmd_analyze_video(args):
         palettes=palettes if len(palettes) > 5 else None,
     )
 
-    # Generate summary
     summary = generate_summary(
         timeline,
         output_dir / "summary.json",
         palettes=palettes,
     )
 
-    # Print summary
     print()
     print("=" * 60)
     print(f"🎬 Analysis Complete: {video_path.name}")
@@ -143,8 +152,7 @@ def cmd_analyze_video(args):
     print(f"   ├── timeline.csv")
     print(f"   ├── timeline.png")
     print(f"   ├── palettes.json")
-    print(f"   ├── summary.json")
-    print(f"   └── frames/")
+    print(f"   └── summary.json")
 
 
 def cmd_palette(args):
@@ -223,6 +231,16 @@ Examples:
     p_pal.add_argument("--output", "-o", default=None, help="Output JSON file")
     p_pal.add_argument("--colors", "-c", type=int, default=5, help="Number of colors (default: 5)")
     p_pal.set_defaults(func=cmd_palette)
+
+    # ── serve ──
+    def cmd_serve(args):
+        from .api import serve
+        serve(host=args.host, port=args.port)
+
+    p_serve = subparsers.add_parser("serve", help="Boot the highly scalable native FastAPI server")
+    p_serve.add_argument("--host", default="127.0.0.1", help="Host IP address")
+    p_serve.add_argument("--port", "-p", type=int, default=8000, help="Port to run on")
+    p_serve.set_defaults(func=cmd_serve)
 
     args = parser.parse_args()
 
