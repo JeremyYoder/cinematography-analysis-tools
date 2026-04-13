@@ -19,37 +19,33 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
 
-    records = []
-    # Hierarchy for tie-breaking: earlier in list has higher priority if predictions are equal
-    shot_hierarchy = ['LS', 'FS', 'MS', 'CS', 'ECS']
-    shot_to_index = {shot: i for i, shot in enumerate(shot_hierarchy)}
+    print(f"Found {len(files)} images to process.")
 
-    for file in files:
+    bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
+
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
+
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # ⚡ Bolt: Instead of creating, sorting, and slicing a pandas DataFrame
-        # per file in the loop, we find the max prediction using a simple max()
-        # with a tie-breaker tuple (prediction_value, -hierarchy_index).
-        best_class, best_prob = max(
-            zip(data.classes, preds_num),
-            key=lambda item: (item[1], -shot_to_index.get(item[0], 999))
-        )
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
-        records.append({
-            'shot-type': best_class,
-            'prediction': best_prob * 100,
+        bdf_list.append({
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
             'shot': str(file)
         })
 
-    # ⚡ Bolt: Construct a single DataFrame at the end
-    if records:
-        bdf = pd.DataFrame(records)
+    if bdf_list:
+        bdf = pd.DataFrame(bdf_list)
     else:
         bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
 
