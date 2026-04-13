@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cinematography-analysis-tools"
+version = "1.0.0"
+description = "Classify cinematic shot types using a pretrained ResNet-50 — with activation heatmaps, video analysis, and CIELAB color palettes."
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Jeremy Yoder"},
+]
+keywords = ["cinematography", "shot-type", "classification", "computer-vision", "heatmaps", "film-analysis"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "torch>=1.7",
+    "torchvision>=0.8",
+    "matplotlib>=3.0",
+    "pandas>=1.0",
+    "numpy>=1.19",
+    "Pillow>=8.0",
+    "scikit-learn>=0.24",
+    "requests>=2.20",
+]
+
+[project.optional-dependencies]
+spaces = ["gradio>=4.0"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+shot-classify = "cinematography_tools.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/JeremyYoder/cinematography-analysis-tools"
+Repository = "https://github.com/JeremyYoder/cinematography-analysis-tools"
+
+[tool.setuptools.packages.find]
+where = ["src"]

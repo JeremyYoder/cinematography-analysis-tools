@@ -1,165 +1,43 @@
-import os
+"""
+Legacy backward-compatibility script for activation heatmaps.
+This script now acts as a thin wrapper around the pip-installable package.
+"""
+
 import argparse
-import torch
-import matplotlib.pyplot as plt
-from pathlib import Path
-from shutil import rmtree
-import tempfile
-from fastai.callbacks.hooks import hook_output
-from matplotlib.ticker import NullLocator
-from fastai.vision import Image, ImageDataBunch, ResizeMethod, imagenet_stats
 
-from initialise import get_model_data
-
-def hooked_backward(m, xb, y):
-    # m[0] is the first part of the network i.e. NOT the FC layer
-    with hook_output(m[0]) as hook_a:
-        with hook_output(m[0], grad=True) as hook_g:
-            preds = m(xb)
-            preds[0,int(y)].backward()
-    return hook_a,hook_g
-
-def show_heatmap(xb_im, hm, path, y, idx, ax, only_heatmap=False, interpolation='bilinear', alpha=0.5):
-    ax.clear()
-    ax.set_axis_off()
-    ax.xaxis.set_major_locator(NullLocator())
-    ax.yaxis.set_major_locator(NullLocator())
-
-    if not only_heatmap: xb_im.show(ax=ax)
-    ax.imshow(hm, alpha=alpha, extent=(0,666,375,0),
-              interpolation=interpolation, cmap='YlOrRd')
-    fname = f'{str(y)}_{str(idx+1)}_heatmap.png'
-    plt.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
-
-def save_img(img, path, y, idx, ax):
-    ax.clear()
-    ax.set_axis_off()
-    ax.xaxis.set_major_locator(NullLocator())
-    ax.yaxis.set_major_locator(NullLocator())
-
-    img.show(ax=ax)
-
-    fname = f'{str(y)}_{str(idx+1)}.png'
-    plt.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
-
-def generate_heatmaps(path, path_img, path_hms, alpha):
-    path_img = Path(path_img)
-    if path_hms is not None:
-        path_hms = Path(path_hms)
-    else:
-        path_hms = path_img
-
-    files = [f for f in path_img.rglob('*') if f.is_file() and f.suffix.lower() in {'.jpg', '.jpeg', '.png'}]
-
-    if not files:
-        print(f"No valid image files found in {path_img}")
-        return
-
-    ###############################################################################
-    ##############################  SETUP  ########################################
-    ###############################################################################
-
-    learn, data = get_model_data(Path(path))
-
-    learn = learn.to_fp32()
-
-    m = learn.model.eval()
-
-    ###############################################################################
-
-    ###############################################################################
-    ########################## GENERATING HEATMAPS ################################
-    ###############################################################################
-
-    # creating the required directories where needed
-    # a dummy `ImageDataBunch` needs to be created to generate heatmaps
-    if path_hms is not None:
-        path_hms.mkdir(parents=True, exist_ok=True)
-
-    train_dir_path = Path(tempfile.mkdtemp(dir=path_img))
-    img_dir_path = train_dir_path/'img'
-    img_dir_path.mkdir(parents=True, exist_ok=True)
-
-    # move from base dir to dummy train dir
-    for file in files:
-        rel_path = file.relative_to(path_img)
-        dest_path = img_dir_path/rel_path
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-        os.rename(file, dest_path)
-
-
-    try:
-        # dummy `ImageDataBunch`
-        temp = ImageDataBunch.from_folder(train_dir_path.parent, train_dir_path.name, size = (375, 666), ds_tfms = None, bs=1,
-                                          resize_method = ResizeMethod.SQUISH, no_check=True,
-                                          num_workers = 0
-                                         ).normalize(imagenet_stats)
-
-        # heatmap generation
-        fig, ax = plt.subplots(figsize=(5,3))
-
-        for idx in range(len(temp.train_ds)):
-            x,y = temp.train_ds[idx]
-            print(f'# {idx+1} / {len(temp.train_ds)}')
-            #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
-            xb = temp.one_item(x)[0]
-            if torch.cuda.is_available(): xb = xb.cuda()
-            xb_im = Image(temp.denorm(xb)[0])
-            hook_a,hook_g = hooked_backward(m, xb, y)
-            acts  = hook_a.stored[0].cpu()
-            avg_acts = acts.mean(0)
-
-            save_img(x, path_hms, y, idx, ax)
-            show_heatmap(xb_im, avg_acts, path_hms, y, idx, ax, only_heatmap=False, interpolation='spline16', alpha=alpha)
-
-        plt.close(fig)
-
-    finally:
-        # deleting dummy directories and moving back files to where they were
-        for file in files:
-            rel_path = file.relative_to(path_img)
-            file_path = img_dir_path/rel_path
-            if file_path.exists():
-                os.rename(file_path, file)
-        rmtree(train_dir_path)
 
 def main():
     parser = argparse.ArgumentParser(
         description='''
         ======================================================================
-          Generate actiavtion heatmaps of the ResNet-50 shot-type classifier
+          Generate activation heatmaps of the ResNet-50 shot-type classifier
         ======================================================================
-
-        Inconveniently, the names of the files when storing the heatmaps get
-        changed, and a lower res version of the heatmaps gets stored. However,
-        this can be changed with trivial modifications to the source code.
-
-         Usage
-        -------
-
-        python get-heatmaps.py
-            --path_base '/home/user/shot-type-classifier'
-            --path_img '/home/user/Desktop/imgs'
-            --path_hms '/home/user/Desktop/imgs/heatmaps'
-            --alpha 0.8
         ''', formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument('--path_base', type=str,
+    parser.add_argument('--path_base', type=str, default=None,
                         help='path to the "shot-type-classifier" directory')
-    parser.add_argument('--path_img', type=str,
+    parser.add_argument('--path_img', type=str, required=True,
                         help='path to where the images are stored')
-    parser.add_argument('--path_hms', type=str, default = None,
-                        help="(optional) path where you'd like to store the heatmaps, if not in the same directory as the images")
-    parser.add_argument('--alpha', type=float, default = 0.5,
-                        help="degree to which you'd like to blend the heatmaps with the original image. Enter 1.0 if you'd like only the heatmap. Default value = 0.5")
+    parser.add_argument('--path_hms', type=str, default=None,
+                        help="(optional) path where you'd like to store the heatmaps")
+    parser.add_argument('--alpha', type=float, default=0.5,
+                        help="degree to which you'd like to blend the heatmaps. Default = 0.5")
     args = parser.parse_args()
 
-    path     = args.path_base
-    path_img = args.path_img
-    path_hms = args.path_hms
-    alpha    = args.alpha
+    try:
+        from cinematography_tools.heatmap import generate_heatmaps
+        generate_heatmaps(
+            path_base=args.path_base,
+            path_img=args.path_img,
+            path_hms=args.path_hms,
+            alpha=args.alpha,
+        )
+    except ImportError:
+        print("Error: cinematography_tools package not installed.")
+        print("Please run: pip install -e .")
+        import sys
+        sys.exit(1)
 
-    generate_heatmaps(path, path_img, path_hms, alpha)
 
 if __name__ == '__main__':
     main()

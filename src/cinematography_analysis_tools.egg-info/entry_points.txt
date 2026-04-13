@@ -1,0 +1,2 @@
+[console_scripts]
+shot-classify = cinematography_tools.cli:main

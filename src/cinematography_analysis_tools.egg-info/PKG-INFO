@@ -1,3 +1,35 @@
+Metadata-Version: 2.4
+Name: cinematography-analysis-tools
+Version: 1.0.0
+Summary: Classify cinematic shot types using a pretrained ResNet-50 — with activation heatmaps, video analysis, and CIELAB color palettes.
+Author: Jeremy Yoder
+License: Apache-2.0
+Project-URL: Homepage, https://github.com/JeremyYoder/cinematography-analysis-tools
+Project-URL: Repository, https://github.com/JeremyYoder/cinematography-analysis-tools
+Keywords: cinematography,shot-type,classification,computer-vision,heatmaps,film-analysis
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Multimedia :: Video
+Classifier: Topic :: Scientific/Engineering :: Image Recognition
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: torch>=1.7
+Requires-Dist: torchvision>=0.8
+Requires-Dist: matplotlib>=3.0
+Requires-Dist: pandas>=1.0
+Requires-Dist: numpy>=1.19
+Requires-Dist: Pillow>=8.0
+Requires-Dist: scikit-learn>=0.24
+Requires-Dist: requests>=2.20
+Provides-Extra: spaces
+Requires-Dist: gradio>=4.0; extra == "spaces"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Dynamic: license-file
+
 This model is a sub-process of a larger integrated content analysis tool. To use the UX optimized Colab notebook, <a href="https://colab.research.google.com/drive/1dCTYluzia7J-E2HdGrDaBQXQyEE9GfxG?usp=sharing">click here</a>.
 
 This model recognizes 5 shot types:
