@@ -19,35 +19,41 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-
-    print(f"Found {len(files)} images to process.")
+    print(files)
 
     bdf_list = []
-    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-    for idx, file in enumerate(files):
-        print(f"Processing image {idx+1}/{len(files)}...")
-
+    for file in files:
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # get best prediction, prioritizing probability then hierarchy
-        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
-        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
+        # form data-frame
+        df = pd.DataFrame(list(zip(data.classes, preds_num)),
+                          columns=['shot-type', 'prediction'])
 
-        bdf_list.append({
-            'shot-type': best_pred[0],
-            'prediction': best_pred[1],
-            'shot': str(file)
-        })
+        # reorder data-frame from largest to smallest shot size
+        df['shot-type'] = pd.Categorical(df['shot-type'],
+                                         ['LS', 'FS', 'MS', 'CS', 'ECS'])
+        df = df.sort_values('shot-type').reset_index(drop=True)
+
+        # probability --> percentage
+        df['prediction'] *= 100
+
+        df = df.sort_values('prediction', ascending=False)
+
+        df = df.head(1)
+
+        df['shot'] = str(file)
+
+        bdf_list.append(df)
 
     if bdf_list:
-        bdf = pd.DataFrame(bdf_list)
+        bdf = pd.concat(bdf_list, ignore_index=True)
     else:
-        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
+        bdf = pd.DataFrame()
 
     bdfname = "preds.csv"
     if path_preds is not None:
