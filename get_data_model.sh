@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Security enhancement: Fail securely on error, undefined variables, or pipeline failures
 set -euo pipefail
