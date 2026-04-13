@@ -16,7 +16,6 @@ def xtra_tfms(base_size = 75*5):
     tilt_   = partial(tilt,   p = 0.5, direction = (0, 3))
     perp_warp_ = partial(perspective_warp, p = 0.5, magnitude = (-0.2, 0.2))
     crop_pad_  = partial(crop_pad, p = 0.5, padding_mode = 'border', row_pct = 0.1, col_pct = 0.1)
-    rgb_randomize_ = partial(rgb_randomize, thresh=0.05)
 
     xtra_tfms = [jitter_(), skew_(), squish_(), perp_warp_(),
                  tilt_(), cutout_(), crop_pad_()]
