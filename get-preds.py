@@ -1,53 +1,59 @@
 import os
-import argparse
-import warnings
 import pandas as pd
 from pathlib import Path
 from fastai.vision import open_image
-from initialise import get_model_data
+from initialise import *
+import argparse
+import warnings
+import os
+import pandas as pd
+from pathlib import Path
 
 warnings.filterwarnings('ignore', '.*default behavior*', )
 warnings.filterwarnings('ignore', '.*torch.solve*', )
 
-def save_preds(path_img, path_preds=None, learn=None, data=None):
+def save_preds(learn, data, path_img, path_preds=None):
     if path_preds is not None:
-        os.makedirs(path_preds, exist_ok=True)
+        os.mkdir(path_preds) if not os.path.exists(path_preds) else None
 
-    path_img_p = Path(path_img)
-    files = [f for f in os.listdir(path_img) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
+    os.chdir(path_img)
+    files = [f for f in os.listdir(
+        path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
 
-    records = []
-    if files and learn is not None and data is not None:
-        for file in files:
-            # open file
-            x = open_image(path_img_p / file)
+    print(f"Found {len(files)} images to process.")
 
-            # get preds
-            preds_num = learn.predict(x)[2].numpy() * 100
+    bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-            # form record
-            records.append([str(file)] + list(preds_num))
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
 
-    if records:
-        df_all = pd.DataFrame(records, columns=['shot'] + list(data.classes))
+        # open file
+        x = open_image(file)
 
-        # order columns from largest to smallest shot size for tie-breaking
-        order = [c for c in ['LS', 'FS', 'MS', 'CS', 'ECS'] if c in data.classes]
-        df_preds = df_all[order]
+        # get preds
+        preds_num = learn.predict(x)[2].numpy()
 
-        bdf = pd.DataFrame()
-        bdf['shot-type'] = df_preds.idxmax(axis=1)
-        bdf['prediction'] = df_preds.max(axis=1)
-        bdf['shot'] = df_all['shot']
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
+
+        bdf_list.append({
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
+            'shot': str(file)
+        })
+
+    if bdf_list:
+        bdf = pd.DataFrame(bdf_list)
     else:
         bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
 
     bdfname = "preds.csv"
     if path_preds is not None:
-        bdf.to_csv(Path(path_preds) / bdfname, index=False)
+        bdf.to_csv(Path(path_preds)/bdfname, index=False)
     else:
-        bdf.to_csv(path_img_p / bdfname, index=False)
+        bdf.to_csv(Path(path_img)/bdfname, index=False)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -65,9 +71,9 @@ if __name__ == '__main__':
             --path_preds '/home/user/Desktop/imgs/preds'
         ''', formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument('--path_base', type=str, required=True,
+    parser.add_argument('--path_base', type=str,
                         help='path to the "shot-type-classifier" directory')
-    parser.add_argument('--path_img', type=str, required=True,
+    parser.add_argument('--path_img', type=str,
                         help='path to where the images are stored')
     parser.add_argument('--path_preds', type=str, default=None,
                         help="path where you'd like to store the predictions")
@@ -80,4 +86,4 @@ if __name__ == '__main__':
     learn, data = get_model_data(Path(path))
     learn = learn.to_fp32()
 
-    save_preds(path_img, path_preds, learn, data)
+    save_preds(learn, data, path_img, path_preds)
