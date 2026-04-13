@@ -19,35 +19,31 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
+
+    print(f"Found {len(files)} images to process.")
 
     bdf_list = []
-
-    # Map for tie-breaking: largest to smallest shot size
     hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-    for file in files:
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
+
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # Combine class and probability
-        class_preds = list(zip(data.classes, preds_num))
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
-        # Find best prediction with tie-breaker
-        # We want the highest probability. If tie, pick the one with lower hierarchy_map value.
-        best_class, best_pred = max(class_preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
-
-        # Append to list of dicts
         bdf_list.append({
-            'shot-type': best_class,
-            'prediction': float(best_pred) * 100, # probability --> percentage
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
             'shot': str(file)
         })
 
-    # Create the final dataframe outside the loop
     if bdf_list:
         bdf = pd.DataFrame(bdf_list)
     else:
