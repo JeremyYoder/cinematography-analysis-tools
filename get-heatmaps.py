@@ -2,9 +2,9 @@ import os
 import argparse
 import torch
 import matplotlib.pyplot as plt
-import tempfile
 from pathlib import Path
 from shutil import rmtree
+import tempfile
 from fastai.callbacks.hooks import hook_output
 from matplotlib.ticker import NullLocator
 from fastai.vision import Image, ImageDataBunch, ResizeMethod, imagenet_stats
@@ -113,22 +113,18 @@ def main():
     if path_hms is not None:
         os.mkdir(path_hms) if not os.path.exists(path_hms) else None
 
-    # Create a secure temporary directory inside path_img instead of hardcoding 'train'
-    temp_dir = tempfile.mkdtemp(dir=path_img)
-    temp_dir_path = Path(temp_dir)
-    img_dir_path = temp_dir_path / 'img'
+    train_dir_path = Path(tempfile.mkdtemp(dir=path_img))
+    img_dir_path = train_dir_path/'img'
     os.mkdir(img_dir_path)
 
-    # Extract just the name of the temporary directory for from_folder
-    temp_dir_name = temp_dir_path.name
+    # move from base dir to dummy train dir
+    for file in files:
+        os.rename(path_img/file, img_dir_path/file)
+
 
     try:
-        # move from base dir to dummy train dir
-        for file in files:
-            os.rename(path_img/file, img_dir_path/file)
-
         # dummy `ImageDataBunch`
-        temp = ImageDataBunch.from_folder(path_img, temp_dir_name, size = (375, 666), ds_tfms = None, bs=1,
+        temp = ImageDataBunch.from_folder(train_dir_path.parent, train_dir_path.name, size = (375, 666), ds_tfms = None, bs=1,
                                           resize_method = ResizeMethod.SQUISH, no_check=True,
                                           num_workers = 0
                                          ).normalize(imagenet_stats)
@@ -148,12 +144,12 @@ def main():
             show_heatmap(xb_im, avg_acts, path_hms, y, idx, only_heatmap=False, interpolation='spline16', alpha=alpha)
 
     finally:
-        # moving back files to where they were, regardless of success or failure
+        # deleting dummy directories and moving back files to where they were
         for file in files:
-            if os.path.exists(img_dir_path/file):
-                os.rename(img_dir_path/file, path_img/file)
-        # deleting temporary directories
-        rmtree(temp_dir_path)
+            file_path = img_dir_path/file
+            if file_path.exists():
+                os.rename(file_path, path_img/file)
+        rmtree(train_dir_path)
 
 if __name__ == '__main__':
     main()
