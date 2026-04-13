@@ -19,38 +19,31 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
+
+    print(f"Found {len(files)} images to process.")
 
     bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-    # ⚡ Bolt: Performance Optimization
-    # 💡 What: Precompute the hierarchy and process predictions with native Python primitives.
-    # 🎯 Why: Iteratively instantiating and sorting Pandas DataFrames inside a loop over files is computationally expensive and slow.
-    # 📊 Impact: Substantially reduces memory allocation and CPU usage per file, resulting in faster processing of large datasets.
-    shot_hierarchy = {k: v for v, k in enumerate(['LS', 'FS', 'MS', 'CS', 'ECS'])}
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
 
-    for file in files:
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # Extract items
-        items = list(zip(data.classes, preds_num))
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
-        # Find best prediction
-        # If predictions tie, it breaks ties based on the shot hierarchy where lower index is better.
-        best_cls, best_pred = max(items, key=lambda i: (i[1], -shot_hierarchy.get(i[0], 999)))
-
-        # Append top result to standard list
         bdf_list.append({
-            'shot-type': best_cls,
-            'prediction': best_pred * 100.0,
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
             'shot': str(file)
         })
 
-    # Instantiate the DataFrame just once at the end
     if bdf_list:
         bdf = pd.DataFrame(bdf_list)
     else:
