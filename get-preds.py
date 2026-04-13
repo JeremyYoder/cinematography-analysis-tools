@@ -19,39 +19,35 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
+
+    print(f"Found {len(files)} images to process.")
 
     bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-    shot_order = {s: i for i, s in enumerate(['LS', 'FS', 'MS', 'CS', 'ECS'])}
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
 
-    for file in files:
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # Combine predictions with classes and map to tie-breaking order
-        preds = [(shot, float(prob) * 100, shot_order.get(shot, 99))
-                 for shot, prob in zip(data.classes, preds_num)]
-
-        # Sort by hierarchy index (tie-breaker) and then find the maximum by probability
-        # In case of equal probabilities, max() returns the first one it encounters.
-        # So we sort by tie-breaker first so the preferred shot type comes first.
-        preds.sort(key=lambda x: x[2])
-        best_shot = max(preds, key=lambda x: x[1])
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
         bdf_list.append({
-            'shot-type': best_shot[0],
-            'prediction': best_shot[1],
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
             'shot': str(file)
         })
 
     if bdf_list:
         bdf = pd.DataFrame(bdf_list)
     else:
-        bdf = pd.DataFrame()
+        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
 
     bdfname = "preds.csv"
     if path_preds is not None:
