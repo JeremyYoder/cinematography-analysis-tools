@@ -19,42 +19,35 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
 
-    preds_list = []
-    file_list = []
+    print(f"Found {len(files)} images to process.")
 
-    for file in files:
+    bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
+
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
+
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
-        preds_list.append(preds_num)
-        file_list.append(str(file))
 
-    if preds_list:
-        classes = data.classes
-        hierarchy = ['LS', 'FS', 'MS', 'CS', 'ECS']
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
-        # Determine the correct tie-breaker column order
-        ordered_cols = [c for c in hierarchy if c in classes] + [c for c in classes if c not in hierarchy]
-        col_indices = [classes.index(c) for c in ordered_cols]
-
-        # Order predictions to handle tie-breaking by hierarchy correctly
-        preds_ordered = [[p[i] for i in col_indices] for p in preds_list]
-
-        df_vec = pd.DataFrame(preds_ordered, columns=ordered_cols)
-
-        # Vectorized ops for top prediction extraction
-        bdf = pd.DataFrame({
-            'shot-type': df_vec.idxmax(axis=1),
-            'prediction': df_vec.max(axis=1) * 100,
-            'shot': file_list
+        bdf_list.append({
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
+            'shot': str(file)
         })
-        bdf['shot-type'] = pd.Categorical(bdf['shot-type'], categories=hierarchy)
+
+    if bdf_list:
+        bdf = pd.DataFrame(bdf_list)
     else:
-        bdf = pd.DataFrame()
+        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
 
     bdfname = "preds.csv"
     if path_preds is not None:
