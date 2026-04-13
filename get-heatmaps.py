@@ -113,21 +113,18 @@ def main():
     if path_hms is not None:
         os.mkdir(path_hms) if not os.path.exists(path_hms) else None
 
-    # Use secure temporary directory instead of hardcoded 'train'
-    temp_dir = tempfile.mkdtemp(dir=path_img, prefix="train_")
-    temp_dir_name = os.path.basename(temp_dir)
-    temp_img_dir = Path(temp_dir) / 'img'
-    os.makedirs(temp_img_dir)
+    train_dir_path = Path(tempfile.mkdtemp(dir=path_img))
+    img_dir_path = train_dir_path/'img'
+    os.mkdir(img_dir_path)
+
+    # move from base dir to dummy train dir
+    for file in files:
+        os.rename(path_img/file, img_dir_path/file)
+
 
     try:
-        # move from base dir to dummy train dir
-        for file in files:
-            if os.path.exists(path_img/file):
-                os.rename(path_img/file, temp_img_dir/file)
-
-
         # dummy `ImageDataBunch`
-        temp = ImageDataBunch.from_folder(path_img, temp_dir_name, size = (375, 666), ds_tfms = None, bs=1,
+        temp = ImageDataBunch.from_folder(train_dir_path.parent, train_dir_path.name, size = (375, 666), ds_tfms = None, bs=1,
                                           resize_method = ResizeMethod.SQUISH, no_check=True,
                                           num_workers = 0
                                          ).normalize(imagenet_stats)
@@ -146,13 +143,13 @@ def main():
             save_img(x, path_hms, y, idx)
             show_heatmap(xb_im, avg_acts, path_hms, y, idx, only_heatmap=False, interpolation='spline16', alpha=alpha)
 
-
     finally:
         # deleting dummy directories and moving back files to where they were
         for file in files:
-            if os.path.exists(temp_img_dir/file):
-                os.rename(temp_img_dir/file, path_img/file)
-        rmtree(temp_dir)
+            file_path = img_dir_path/file
+            if file_path.exists():
+                os.rename(file_path, path_img/file)
+        rmtree(train_dir_path)
 
 if __name__ == '__main__':
     main()
