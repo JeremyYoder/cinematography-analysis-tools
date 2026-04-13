@@ -9,7 +9,7 @@ from fastai.callbacks.hooks import hook_output
 from matplotlib.ticker import NullLocator
 from fastai.vision import Image, ImageDataBunch, ResizeMethod, imagenet_stats
 
-from initialise import *
+from initialise import get_model_data
 
 def hooked_backward(m, xb, y):
     # m[0] is the first part of the network i.e. NOT the FC layer
