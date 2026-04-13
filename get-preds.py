@@ -19,35 +19,34 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-
-    print(f"Found {len(files)} images to process.")
+    print(files)
 
     bdf_list = []
-    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-    for idx, file in enumerate(files):
-        print(f"Processing image {idx+1}/{len(files)}...")
+    hierarchy_map = {cls: i for i, cls in enumerate(['LS', 'FS', 'MS', 'CS', 'ECS'])}
 
+    for file in files:
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # get best prediction, prioritizing probability then hierarchy
-        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
-        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
+        # Find best prediction using Python native max operation
+        # Sort by highest prediction, tie-breaking using the hierarchy order (lowest index wins)
+        preds = list(zip(data.classes, preds_num))
+        best_class, best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
         bdf_list.append({
-            'shot-type': best_pred[0],
-            'prediction': best_pred[1],
+            'shot-type': best_class,
+            'prediction': best_pred * 100,
             'shot': str(file)
         })
 
     if bdf_list:
         bdf = pd.DataFrame(bdf_list)
     else:
-        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
+        bdf = pd.DataFrame()
 
     bdfname = "preds.csv"
     if path_preds is not None:
