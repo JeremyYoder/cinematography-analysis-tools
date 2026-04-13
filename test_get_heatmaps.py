@@ -53,19 +53,35 @@ class TestGetHeatmaps(unittest.TestCase):
         sys.modules.update(cls.original_modules)
 
     def test_generate_heatmaps(self):
-        with patch.object(self.get_heatmaps.os, 'path') as mock_path_mod, \
-             patch.object(self.get_heatmaps.os, 'listdir') as mock_listdir, \
-             patch.object(self.get_heatmaps.os, 'mkdir') as mock_mkdir, \
+        with patch('get_heatmaps.Path.rglob') as mock_rglob, \
+             patch('get_heatmaps.Path.mkdir') as mock_mkdir, \
+             patch('get_heatmaps.tempfile.mkdtemp') as mock_mkdtemp, \
              patch.object(self.get_heatmaps.os, 'rename') as mock_rename, \
              patch.object(self.get_heatmaps, 'rmtree') as mock_rmtree, \
              patch.object(self.get_heatmaps, 'get_model_data') as mock_get_model_data, \
              patch.object(self.get_heatmaps.ImageDataBunch, 'from_folder') as mock_from_folder, \
              patch.object(self.get_heatmaps, 'hooked_backward') as mock_hooked_backward, \
              patch.object(self.get_heatmaps, 'save_img') as mock_save_img, \
-             patch.object(self.get_heatmaps, 'show_heatmap') as mock_show_heatmap:
+             patch.object(self.get_heatmaps, 'show_heatmap') as mock_show_heatmap, \
+             patch.object(self.get_heatmaps.plt, 'subplots') as mock_subplots:
 
-            mock_path_mod.exists.return_value = False
-            mock_listdir.return_value = ['img1.jpg', 'img2.png']
+            mock_file1 = MagicMock()
+            mock_file1.name = 'img1.jpg'
+            mock_file1.is_file.return_value = True
+            mock_file1.suffix.lower.return_value = '.jpg'
+
+            mock_file2 = MagicMock()
+            mock_file2.name = 'img2.png'
+            mock_file2.is_file.return_value = True
+            mock_file2.suffix.lower.return_value = '.png'
+
+            mock_rglob.return_value = [mock_file1, mock_file2]
+
+            mock_fig = MagicMock()
+            mock_ax = MagicMock()
+            mock_subplots.return_value = (mock_fig, mock_ax)
+
+            mock_mkdtemp.return_value = '/fake/tmp/dir'
 
             mock_learn = MagicMock()
             mock_learn.to_fp32.return_value = mock_learn
@@ -93,8 +109,8 @@ class TestGetHeatmaps(unittest.TestCase):
             self.assertEqual(mock_save_img.call_count, 2)
             self.assertEqual(mock_show_heatmap.call_count, 2)
             mock_rmtree.assert_called_once()
-            self.assertTrue(mock_mkdir.called)
             self.assertTrue(mock_rename.called)
+            mock_subplots.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
