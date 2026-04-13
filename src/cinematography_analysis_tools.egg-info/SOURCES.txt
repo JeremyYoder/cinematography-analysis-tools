@@ -9,11 +9,13 @@ src/cinematography_analysis_tools.egg-info/requires.txt
 src/cinematography_analysis_tools.egg-info/top_level.txt
 src/cinematography_tools/__init__.py
 src/cinematography_tools/api.py
+src/cinematography_tools/charts.py
 src/cinematography_tools/cli.py
 src/cinematography_tools/color.py
 src/cinematography_tools/export_onnx.py
 src/cinematography_tools/heatmap.py
 src/cinematography_tools/model.py
+src/cinematography_tools/performance.py
 src/cinematography_tools/predict.py
 src/cinematography_tools/timeline.py
 src/cinematography_tools/transforms.py

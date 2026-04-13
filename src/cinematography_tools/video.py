@@ -194,7 +194,7 @@ def stream_frames(
     cmd = [
         "ffmpeg",
         "-i", str(video_path),
-        "-vf", f"fps={sample_rate}",
+        "-vf", f"fps={sample_rate},scale=224:224:flags=area",
         "-f", "image2pipe",
         "-vcodec", "rawvideo",
         "-pix_fmt", "rgb24",
@@ -206,8 +206,12 @@ def stream_frames(
 
     cmd.append("-")  # Pipe output to stdout
 
+    # New frame size is 224x224
+    width, height = 224, 224
+    frame_size = width * height * 3
+
     print(f"Streaming in-memory frames from {video_path.name}...")
-    print(f"  Resolution: {width}x{height} | Target: {sample_rate} fps")
+    print(f"  Resolution: {width}x{height} (Source Scaled) | Target: {sample_rate} fps")
 
     process = subprocess.Popen(
         cmd,

@@ -26,15 +26,7 @@ HIERARCHY_MAP = {"LS": 0, "FS": 1, "MS": 2, "CS": 3, "ECS": 4}
 
 
 def predict_image(model: torch.nn.Module, image: Path | str | Image.Image) -> Dict:
-    """Predict the shot type of a single image using pure PyTorch.
-
-    Args:
-        model: PyTorch ResNet50 classifier.
-        image: Path to the image file, or an opened PIL Image.
-
-    Returns:
-        Dict with keys: shot_type, confidence, all_predictions, file (if applicable).
-    """
+    """Predict the shot type of a single image using pure PyTorch."""
     from .transforms import get_inference_transforms
     
     device = next(model.parameters()).device
@@ -53,10 +45,7 @@ def predict_image(model: torch.nn.Module, image: Path | str | Image.Image) -> Di
         logits = model(tensor)
         probs = torch.nn.functional.softmax(logits, dim=1).squeeze(0).cpu().numpy()
 
-    all_preds = [
-        (SHOT_TYPES[i], float(probs[i]) * 100)
-        for i in range(len(SHOT_TYPES))
-    ]
+    all_preds = [(SHOT_TYPES[i], float(probs[i]) * 100) for i in range(len(SHOT_TYPES))]
     best = max(all_preds, key=lambda p: (p[1], -HIERARCHY_MAP.get(p[0], 999)))
 
     return {
@@ -65,6 +54,45 @@ def predict_image(model: torch.nn.Module, image: Path | str | Image.Image) -> Di
         "all_predictions": {cls: conf for cls, conf in all_preds},
         "file": file_name,
     }
+
+
+def predict_images_batch(model: torch.nn.Module, images: List[Image.Image]) -> List[Dict]:
+    """Predict shot types for a batch of images in parallel.
+
+    This function utilizes the hardware much more effectively for video analysis
+    by processing multiple frames in a single (N, 3, 224, 224) tensor.
+
+    Args:
+        model: PyTorch ResNet50 classifier.
+        images: List of opened PIL Images.
+
+    Returns:
+        List of prediction dicts (shot_type, confidence).
+    """
+    if not images:
+        return []
+
+    from .transforms import get_inference_transforms
+    device = next(model.parameters()).device
+    tfms = get_inference_transforms()
+
+    # Stack all images into a single batch tensor
+    batch_tensor = torch.stack([tfms(img.convert("RGB")) for img in images]).to(device)
+
+    with torch.no_grad():
+        logits = model(batch_tensor)
+        probs_batch = torch.nn.functional.softmax(logits, dim=1).cpu().numpy()
+
+    batch_results = []
+    for probs in probs_batch:
+        all_preds = [(SHOT_TYPES[i], float(probs[i]) * 100) for i in range(len(SHOT_TYPES))]
+        best = max(all_preds, key=lambda p: (p[1], -HIERARCHY_MAP.get(p[0], 999)))
+        batch_results.append({
+            "shot_type": best[0],
+            "confidence": best[1],
+        })
+
+    return batch_results
 
 
 def predict_batch(

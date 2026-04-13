@@ -59,12 +59,12 @@ def build_timeline(
 
     # Merge consecutive frames with the same shot type into segments
     segments = []
-    current_type = predictions.iloc[0]["shot-type"]
+    current_type = predictions.iloc[0]["shot_type"]
     current_start = 0.0
-    confidences = [predictions.iloc[0]["prediction"]]
+    confidences = [predictions.iloc[0]["confidence"]]
 
     for _, row in predictions.iloc[1:].iterrows():
-        if row["shot-type"] != current_type:
+        if row["shot_type"] != current_type:
             # Shot change detected
             segments.append({
                 "start_time": round(current_start, 2),
@@ -73,11 +73,11 @@ def build_timeline(
                 "confidence": round(np.mean(confidences), 2),
                 "duration": round(row["timestamp"] - current_start, 2),
             })
-            current_type = row["shot-type"]
+            current_type = row["shot_type"]
             current_start = row["timestamp"]
-            confidences = [row["prediction"]]
+            confidences = [row["confidence"]]
         else:
-            confidences.append(row["prediction"])
+            confidences.append(row["confidence"])
 
     # Add final segment
     segments.append({
@@ -94,100 +94,82 @@ def build_timeline(
 def visualize_timeline(
     timeline: pd.DataFrame,
     output_path: Path,
-    title: str = "Shot Type Timeline",
+    title: str = "Cinematic Shot Breakdown",
     video_duration: Optional[float] = None,
     palettes: Optional[List[Dict]] = None,
 ):
-    """Generate a visual shot timeline chart.
-
-    Creates a horizontal bar chart showing shot types over time,
-    with optional color palette strips below.
-
-    Args:
-        timeline: Timeline DataFrame from build_timeline().
-        output_path: Path to save the visualization PNG.
-        title: Chart title.
-        video_duration: Total video duration for x-axis scaling.
-        palettes: Optional color palette data for annotation.
-    """
+    """Generate a high-definition visual shot timeline chart."""
     if timeline.empty:
-        print("No timeline data to visualize.")
         return
 
     duration = video_duration or timeline["end_time"].max()
 
-    # Create figure with timeline + optional palette strip
+    # Create figure with high-definition proportions
     n_rows = 2 if palettes else 1
-    height_ratios = [3, 1] if palettes else [1]
+    height_ratios = [4, 1.2] if palettes else [1]
     fig, axes = plt.subplots(
         n_rows, 1,
-        figsize=(max(14, duration / 10), 3 + (1 if palettes else 0)),
+        figsize=(16, 4.5 if palettes else 3),
         gridspec_kw={"height_ratios": height_ratios},
         squeeze=False,
     )
-    fig.patch.set_facecolor("#1a1a2e")
+    fig.patch.set_facecolor("#0f172a") # Darker slate background
 
     # ── Shot type timeline ──
     ax = axes[0, 0]
-    ax.set_facecolor("#16213e")
+    ax.set_facecolor("#1e293b")
 
     for _, row in timeline.iterrows():
         color = SHOT_COLORS.get(row["shot_type"], "#888888")
         ax.barh(
             0, row["duration"], left=row["start_time"],
-            height=0.6, color=color, edgecolor="#1a1a2e", linewidth=0.5,
+            height=0.8, color=color, edgecolor="#0f172a", linewidth=1,
         )
-        # Add label if segment is wide enough
-        if row["duration"] > duration * 0.03:
+        if row["duration"] > duration * 0.02:
             ax.text(
                 row["start_time"] + row["duration"] / 2, 0,
                 row["shot_type"],
                 ha="center", va="center",
-                fontsize=8, fontweight="bold", color="white",
-                fontfamily="monospace",
+                fontsize=10, fontweight="bold", color="white",
+                alpha=0.9
             )
 
     ax.set_xlim(0, duration)
     ax.set_ylim(-0.5, 0.5)
     ax.set_yticks([])
-    ax.set_xlabel("Time (seconds)", color="#e0e0e0", fontsize=10)
-    ax.set_title(title, color="#e0e0e0", fontsize=14, fontweight="bold", pad=12)
-    ax.tick_params(colors="#e0e0e0", labelsize=8)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_visible(False)
-    ax.spines["bottom"].set_color("#444444")
-
-    # Legend
+    ax.set_xlabel("Time (seconds)", color="#94a3b8", fontsize=11, labelpad=8)
+    ax.set_title(title, color="#f8fafc", fontsize=16, fontweight="bold", pad=20)
+    ax.tick_params(colors="#94a3b8", labelsize=10)
+    for spine in ax.spines.values():
+        spine.set_color("#334155")
+    
+    # Premium Legend
     legend_patches = [
-        mpatches.Patch(
-            color=SHOT_COLORS[st],
-            label=f"{st} — {SHOT_TYPE_LABELS.get(st, st)}",
-        )
+        mpatches.Patch(color=SHOT_COLORS[st], label=f"{st} — {SHOT_TYPE_LABELS.get(st, st)}")
         for st in SHOT_TYPES if st in timeline["shot_type"].values
     ]
     ax.legend(
         handles=legend_patches,
         loc="upper right",
-        fontsize=7,
-        facecolor="#16213e",
-        edgecolor="#444444",
-        labelcolor="#e0e0e0",
+        fontsize=9,
+        facecolor="#1e293b",
+        edgecolor="#334155",
+        labelcolor="#f1f5f9",
         ncol=len(legend_patches),
+        bbox_to_anchor=(1.0, 1.15)
     )
 
-    # ── Color palette strip (if provided) ──
+    # ── Color gamut strip ──
     if palettes and n_rows > 1:
         ax2 = axes[1, 0]
-        ax2.set_facecolor("#16213e")
+        ax2.set_facecolor("#1e293b")
         ax2.set_yticks([])
         ax2.set_xlim(0, duration)
 
-        # Map palette entries to timeline segments
         n_frames = len(palettes)
         for i, pal_data in enumerate(palettes):
-            t = i / n_frames * duration
-            w = duration / n_frames
+            t = pal_data.get("timestamp", i / n_frames * duration)
+            w = (duration / n_frames) * 1.5 # Slight overlap for smoothness
             palette = pal_data.get("palette", [])
             if palette:
                 n_colors = len(palette)
@@ -202,15 +184,13 @@ def visualize_timeline(
                     ))
 
         ax2.set_ylim(0, 1)
-        ax2.set_xlabel("Color Palette", color="#e0e0e0", fontsize=9)
-        ax2.tick_params(colors="#e0e0e0", labelsize=8)
-        ax2.spines["top"].set_visible(False)
-        ax2.spines["right"].set_visible(False)
-        ax2.spines["left"].set_visible(False)
-        ax2.spines["bottom"].set_color("#444444")
+        ax2.set_xlabel("Global Color Palette", color="#94a3b8", fontsize=10)
+        ax2.tick_params(colors="#94a3b8", labelsize=10)
+        for spine in ax2.spines.values():
+            spine.set_color("#334155")
 
     plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
+    plt.savefig(output_path, dpi=180, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
     print(f"  ✅ Timeline saved to {output_path}")
 
@@ -253,23 +233,43 @@ def generate_summary(
             "avg_shot_duration": round(timeline["duration"].mean(), 2),
             "shortest_shot": round(timeline["duration"].min(), 2),
             "longest_shot": round(timeline["duration"].max(), 2),
+            "rhythm": timeline[["start_time", "duration", "shot_type"]].to_dict("records"),
+        }
+
+        # Cinematic Scale (Wide vs Tight)
+        wide_count = sum(distribution.get(st, {}).get("count", 0) for st in ["LS", "FS"])
+        tight_count = sum(distribution.get(st, {}).get("count", 0) for st in ["MS", "CS", "ECS"])
+        summary["cinematic_scale"] = {
+            "wide_count": wide_count,
+            "tight_count": tight_count,
+            "wide_percentage": round(wide_count / max(1, len(timeline)) * 100, 1),
         }
 
         # Add overall color palette if available
         if palettes:
-            # Aggregate all palette colors across the video
             all_colors = []
+            lab_b_values = []
             for pal in palettes:
                 for c in pal.get("palette", []):
                     all_colors.append(c["hex"])
+                    if "lab" in c:
+                        lab_b_values.append(c["lab"][2]) # b* channel
+
             if all_colors:
-                # Top 10 most frequent colors
                 from collections import Counter
-                color_counts = Counter(all_colors).most_common(10)
+                color_counts = Counter(all_colors).most_common(12)
                 summary["dominant_colors"] = [
                     {"hex": hex_val, "frequency": count}
                     for hex_val, count in color_counts
                 ]
+
+            if lab_b_values:
+                avg_b = sum(lab_b_values) / len(lab_b_values)
+                summary["color_mood"] = {
+                    "avg_b": round(avg_b, 2),
+                    "label": "Warm / Golden" if avg_b > 2 else "Cool / Melancholic" if avg_b < -2 else "Neutral / Balanced",
+                    "warmth_score": round(min(max((avg_b + 20) / 40 * 100, 0), 100), 1) # Simple 0-100 score
+                }
 
     output_path = Path(output_path)
     with open(output_path, "w") as f:
