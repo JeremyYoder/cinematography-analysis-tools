@@ -415,10 +415,10 @@ with gr.Blocks(
             """)
 
 if __name__ == "__main__":
-    # Modern Gradio 4 launch for Python 3.9
+    # Silicon-Native Hub (Gradio 5 / Python 3.11)
     demo.queue() 
     demo.launch(
         server_name="127.0.0.1",
-        show_api=False, # Disable API to bypass the 'bool' schema bug in v4.44
+        show_api=False, # Bypass schema bug in current framework
         quiet=False
     )
