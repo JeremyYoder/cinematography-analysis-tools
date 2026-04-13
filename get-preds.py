@@ -1,64 +1,53 @@
 import os
-import argparse
-import warnings
 import pandas as pd
 from pathlib import Path
 from fastai.vision import open_image
-from initialise import get_model_data
+from initialise import *
+import argparse
+import warnings
+import os
+import pandas as pd
+from pathlib import Path
 
 warnings.filterwarnings('ignore', '.*default behavior*', )
 warnings.filterwarnings('ignore', '.*torch.solve*', )
 
-def save_preds(path_img, learn, data, path_preds=None):
+def save_preds(learn, data, path_img, path_preds=None):
     if path_preds is not None:
         os.mkdir(path_preds) if not os.path.exists(path_preds) else None
 
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
+
+    print(f"Found {len(files)} images to process.")
 
     bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-    for file in files:
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
+
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # form data-frame
-        df = pd.DataFrame(list(zip(data.classes, preds_num)),
-                          columns=['shot-type', 'prediction'])
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
-        # reorder data-frame from largest to smallest shot size
-        df['shot-type'] = pd.Categorical(df['shot-type'],
-                                         ['LS', 'FS', 'MS', 'CS', 'ECS'])
-        df = df.sort_values('shot-type').reset_index(drop=True)
-
-        # probability --> percentage
-        df['prediction'] *= 100
-
-        df = df.sort_values('prediction', ascending=False)
-
-        df = df.head(1)
-
-        df['shot'] = str(file)
-
-        bdf_list.append(df)
-
-        # save to disk
-        #fname = file.rpartition('.')[0] + '_preds.csv'
-        # if path_preds is not None:
-        #    df.to_csv(Path(path_preds)/fname, index=False)
-
-        # else:
-        #    df.to_csv(Path(path_img)/fname, index=False)
+        bdf_list.append({
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
+            'shot': str(file)
+        })
 
     if bdf_list:
-        bdf = pd.concat(bdf_list, ignore_index=True)
+        bdf = pd.DataFrame(bdf_list)
     else:
-        bdf = pd.DataFrame()
+        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
 
     bdfname = "preds.csv"
     if path_preds is not None:
@@ -97,4 +86,4 @@ if __name__ == '__main__':
     learn, data = get_model_data(Path(path))
     learn = learn.to_fp32()
 
-    save_preds(path_img, learn, data, path_preds)
+    save_preds(learn, data, path_img, path_preds)
