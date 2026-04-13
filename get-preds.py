@@ -1,65 +1,61 @@
 import os
-import argparse
-import warnings
 import pandas as pd
 from pathlib import Path
+from fastai.vision import open_image
 from initialise import *
+import argparse
+import warnings
+import os
+import pandas as pd
+from pathlib import Path
 
-def save_preds(path_img, path_preds=None, learn=None, data=None):
-    if path_img is None:
-        return
+warnings.filterwarnings('ignore', '.*default behavior*', )
+warnings.filterwarnings('ignore', '.*torch.solve*', )
 
+def save_preds(learn, data, path_img, path_preds=None):
     if path_preds is not None:
         os.mkdir(path_preds) if not os.path.exists(path_preds) else None
 
-    # Get the original directory to restore it later
-    orig_dir = os.getcwd()
-    try:
-        os.chdir(path_img)
-        files = [f for f in os.listdir(
-            path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-        print(files)
+    os.chdir(path_img)
+    files = [f for f in os.listdir(
+        path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
 
-        if not files:
-            bdf = pd.DataFrame()
-        else:
-            records = []
-            for file in files:
-                # open file
-                from fastai.vision import open_image
-                x = open_image(file)
+    print(f"Found {len(files)} images to process.")
 
-                # get preds
-                preds_num = learn.predict(x)[2].numpy() * 100
+    bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-                record = dict(zip(data.classes, preds_num))
-                record['shot'] = str(file)
-                records.append(record)
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
 
-            df = pd.DataFrame(records)
+        # open file
+        x = open_image(file)
 
-            # Enforce tie-breaking sequence
-            classes_ordered = ['LS', 'FS', 'MS', 'CS', 'ECS']
-            df_classes = df[classes_ordered]
+        # get preds
+        preds_num = learn.predict(x)[2].numpy()
 
-            bdf = pd.DataFrame({
-                'shot-type': df_classes.idxmax(axis=1),
-                'prediction': df_classes.max(axis=1),
-                'shot': df['shot']
-            })
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
-        bdfname = "preds.csv"
-        if path_preds is not None:
-            bdf.to_csv(Path(path_preds)/bdfname, index=False)
-        else:
-            bdf.to_csv(Path(path_img)/bdfname, index=False)
-    finally:
-        os.chdir(orig_dir)
+        bdf_list.append({
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
+            'shot': str(file)
+        })
+
+    if bdf_list:
+        bdf = pd.DataFrame(bdf_list)
+    else:
+        bdf = pd.DataFrame(columns=['shot-type', 'prediction', 'shot'])
+
+    bdfname = "preds.csv"
+    if path_preds is not None:
+        bdf.to_csv(Path(path_preds)/bdfname, index=False)
+    else:
+        bdf.to_csv(Path(path_img)/bdfname, index=False)
 
 if __name__ == '__main__':
-    warnings.filterwarnings('ignore', '.*default behavior*', )
-    warnings.filterwarnings('ignore', '.*torch.solve*', )
-
     parser = argparse.ArgumentParser(
         description='''
         ======================================================================
@@ -90,4 +86,4 @@ if __name__ == '__main__':
     learn, data = get_model_data(Path(path))
     learn = learn.to_fp32()
 
-    save_preds(path_img, path_preds, learn=learn, data=data)
+    save_preds(learn, data, path_img, path_preds)
