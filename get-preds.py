@@ -19,29 +19,28 @@ def save_preds(learn, data, path_img, path_preds=None):
     os.chdir(path_img)
     files = [f for f in os.listdir(
         path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    print(files)
 
-    # Dictionary to enforce hierarchy for tie-breaking: largest to smallest shot size
-    hierarchy = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
+    print(f"Found {len(files)} images to process.")
 
     bdf_list = []
+    hierarchy_map = {'LS': 0, 'FS': 1, 'MS': 2, 'CS': 3, 'ECS': 4}
 
-    for file in files:
+    for idx, file in enumerate(files):
+        print(f"Processing image {idx+1}/{len(files)}...")
+
         # open file
         x = open_image(file)
 
         # get preds
         preds_num = learn.predict(x)[2].numpy()
 
-        # Extract top prediction based on probability, using hierarchy to resolve ties
-        best_class, best_pred = max(
-            zip(data.classes, preds_num),
-            key=lambda item: (item[1], -hierarchy.get(item[0], 999))
-        )
+        # get best prediction, prioritizing probability then hierarchy
+        preds = [(data.classes[i], float(preds_num[i]) * 100) for i in range(len(data.classes))]
+        best_pred = max(preds, key=lambda p: (p[1], -hierarchy_map.get(p[0], 999)))
 
         bdf_list.append({
-            'shot-type': best_class,
-            'prediction': best_pred * 100,
+            'shot-type': best_pred[0],
+            'prediction': best_pred[1],
             'shot': str(file)
         })
 
