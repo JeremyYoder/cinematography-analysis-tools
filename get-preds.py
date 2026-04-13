@@ -1,13 +1,12 @@
-import os
-import pandas as pd
-from pathlib import Path
-from fastai.vision import open_image
-from initialise import *
 import argparse
-import warnings
 import os
+import warnings
+
 import pandas as pd
+from fastai.vision import open_image
 from pathlib import Path
+
+from initialise import get_model_data
 
 warnings.filterwarnings('ignore', '.*default behavior*', )
 warnings.filterwarnings('ignore', '.*torch.solve*', )
