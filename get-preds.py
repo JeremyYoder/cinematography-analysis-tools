@@ -14,11 +14,10 @@ warnings.filterwarnings('ignore', '.*torch.solve*', )
 
 def save_preds(learn, data, path_img, path_preds=None):
     if path_preds is not None:
-        os.mkdir(path_preds) if not os.path.exists(path_preds) else None
+        Path(path_preds).mkdir(parents=True, exist_ok=True)
 
-    os.chdir(path_img)
-    files = [f for f in os.listdir(
-        path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
+    path_img_obj = Path(path_img)
+    files = [f for f in path_img_obj.rglob('*') if f.is_file() and f.suffix.lower() in {'.jpg', '.jpeg', '.png'}]
 
     print(f"Found {len(files)} images to process.")
 
@@ -41,7 +40,7 @@ def save_preds(learn, data, path_img, path_preds=None):
         bdf_list.append({
             'shot-type': best_pred[0],
             'prediction': best_pred[1],
-            'shot': str(file)
+            'shot': str(file.relative_to(path_img_obj))
         })
 
     if bdf_list:
@@ -83,7 +82,13 @@ if __name__ == '__main__':
     path_img = args.path_img
     path_preds = args.path_preds
 
-    learn, data = get_model_data(Path(path))
-    learn = learn.to_fp32()
+    path_img_obj = Path(path_img)
+    files = [f for f in path_img_obj.rglob('*') if f.is_file() and f.suffix.lower() in {'.jpg', '.jpeg', '.png'}]
 
-    save_preds(learn, data, path_img, path_preds)
+    if not files:
+        print(f"No valid image files found in {path_img}")
+    else:
+        learn, data = get_model_data(Path(path))
+        learn = learn.to_fp32()
+
+        save_preds(learn, data, path_img, path_preds)

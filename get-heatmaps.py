@@ -19,34 +19,109 @@ def hooked_backward(m, xb, y):
             preds[0,int(y)].backward()
     return hook_a,hook_g
 
-def show_heatmap(xb_im, hm, path, y, idx, only_heatmap=False, interpolation='bilinear', alpha=0.5):
-    _,ax = plt.subplots(figsize=(5,3))
+def show_heatmap(xb_im, hm, path, y, idx, ax, only_heatmap=False, interpolation='bilinear', alpha=0.5):
+    ax.clear()
+    ax.set_axis_off()
+    ax.xaxis.set_major_locator(NullLocator())
+    ax.yaxis.set_major_locator(NullLocator())
 
-    plt.gca().set_axis_off()
-    plt.gca().xaxis.set_major_locator(NullLocator())
-    plt.gca().yaxis.set_major_locator(NullLocator())
-
-    if not only_heatmap: xb_im.show(ax)
+    if not only_heatmap: xb_im.show(ax=ax)
     ax.imshow(hm, alpha=alpha, extent=(0,666,375,0),
               interpolation=interpolation, cmap='YlOrRd')
     fname = f'{str(y)}_{str(idx+1)}_heatmap.png'
     plt.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
 
-    plt.close()
-    plt.close('all')
+def save_img(img, path, y, idx, ax):
+    ax.clear()
+    ax.set_axis_off()
+    ax.xaxis.set_major_locator(NullLocator())
+    ax.yaxis.set_major_locator(NullLocator())
 
-def save_img(img, path, y, idx):
-    img.show(figsize = (5,3))
-
-    plt.gca().set_axis_off()
-    plt.gca().xaxis.set_major_locator(NullLocator())
-    plt.gca().yaxis.set_major_locator(NullLocator())
+    img.show(ax=ax)
 
     fname = f'{str(y)}_{str(idx+1)}.png'
     plt.savefig(path/fname, bbox_inches = 'tight', pad_inches = 0, dpi=800)
 
-    plt.close()
-    plt.close('all')
+def generate_heatmaps(path, path_img, path_hms, alpha):
+    path_img = Path(path_img)
+    if path_hms is not None:
+        path_hms = Path(path_hms)
+    else:
+        path_hms = path_img
+
+    files = [f for f in path_img.rglob('*') if f.is_file() and f.suffix.lower() in {'.jpg', '.jpeg', '.png'}]
+
+    if not files:
+        print(f"No valid image files found in {path_img}")
+        return
+
+    ###############################################################################
+    ##############################  SETUP  ########################################
+    ###############################################################################
+
+    learn, data = get_model_data(Path(path))
+
+    learn = learn.to_fp32()
+
+    m = learn.model.eval()
+
+    ###############################################################################
+
+    ###############################################################################
+    ########################## GENERATING HEATMAPS ################################
+    ###############################################################################
+
+    # creating the required directories where needed
+    # a dummy `ImageDataBunch` needs to be created to generate heatmaps
+    if path_hms is not None:
+        path_hms.mkdir(parents=True, exist_ok=True)
+
+    train_dir_path = Path(tempfile.mkdtemp(dir=path_img))
+    img_dir_path = train_dir_path/'img'
+    img_dir_path.mkdir(parents=True, exist_ok=True)
+
+    # move from base dir to dummy train dir
+    for file in files:
+        rel_path = file.relative_to(path_img)
+        dest_path = img_dir_path/rel_path
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        os.rename(file, dest_path)
+
+
+    try:
+        # dummy `ImageDataBunch`
+        temp = ImageDataBunch.from_folder(train_dir_path.parent, train_dir_path.name, size = (375, 666), ds_tfms = None, bs=1,
+                                          resize_method = ResizeMethod.SQUISH, no_check=True,
+                                          num_workers = 0
+                                         ).normalize(imagenet_stats)
+
+        # heatmap generation
+        fig, ax = plt.subplots(figsize=(5,3))
+
+        for idx in range(len(temp.train_ds)):
+            x,y = temp.train_ds[idx]
+            print(f'# {idx+1} / {len(temp.train_ds)}')
+            #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
+            xb = temp.one_item(x)[0]
+            if torch.cuda.is_available(): xb = xb.cuda()
+            xb_im = Image(temp.denorm(xb)[0])
+            hook_a,hook_g = hooked_backward(m, xb, y)
+            acts  = hook_a.stored[0].cpu()
+            avg_acts = acts.mean(0)
+
+            save_img(x, path_hms, y, idx, ax)
+            show_heatmap(xb_im, avg_acts, path_hms, y, idx, ax, only_heatmap=False, interpolation='spline16', alpha=alpha)
+
+        plt.close(fig)
+
+    finally:
+        # deleting dummy directories and moving back files to where they were
+        for file in files:
+            rel_path = file.relative_to(path_img)
+            file_path = img_dir_path/rel_path
+            if file_path.exists():
+                os.rename(file_path, file)
+        rmtree(train_dir_path)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -84,72 +159,7 @@ def main():
     path_hms = args.path_hms
     alpha    = args.alpha
 
-    ###############################################################################
-    ##############################  SETUP  ########################################
-    ###############################################################################
-
-    learn, data = get_model_data(Path(path))
-
-    learn = learn.to_fp32()
-
-    m = learn.model.eval()
-
-    ###############################################################################
-
-    ###############################################################################
-    ########################## GENERATING HEATMAPS ################################
-    ###############################################################################
-
-    path_img = Path(path_img)
-    if path_hms is not None:
-        path_hms = Path(path_hms)
-    else:
-        path_hms = path_img
-
-    files = [f for f in os.listdir(path_img) if f.endswith(('.jpg', '.jpeg', '.png'))]
-
-    # creating the required directories where needed
-    # a dummy `ImageDataBunch` needs to be created to generate heatmaps
-    if path_hms is not None:
-        os.mkdir(path_hms) if not os.path.exists(path_hms) else None
-
-    train_dir_path = Path(tempfile.mkdtemp(dir=path_img))
-    img_dir_path = train_dir_path/'img'
-    os.mkdir(img_dir_path)
-
-    # move from base dir to dummy train dir
-    for file in files:
-        os.rename(path_img/file, img_dir_path/file)
-
-
-    try:
-        # dummy `ImageDataBunch`
-        temp = ImageDataBunch.from_folder(train_dir_path.parent, train_dir_path.name, size = (375, 666), ds_tfms = None, bs=1,
-                                          resize_method = ResizeMethod.SQUISH, no_check=True,
-                                          num_workers = 0
-                                         ).normalize(imagenet_stats)
-        # heatmap generation
-        for idx in range(len(temp.train_ds)):
-            x,y = temp.train_ds[idx]
-            print(f'# {idx+1} / {len(temp.train_ds)}')
-            #x.show(title = str(temp.valid_ds.y[idx]), figsize = (8, 5))
-            xb = temp.one_item(x)[0]
-            if torch.cuda.is_available(): xb = xb.cuda()
-            xb_im = Image(temp.denorm(xb)[0])
-            hook_a,hook_g = hooked_backward(m, xb, y)
-            acts  = hook_a.stored[0].cpu()
-            avg_acts = acts.mean(0)
-
-            save_img(x, path_hms, y, idx)
-            show_heatmap(xb_im, avg_acts, path_hms, y, idx, only_heatmap=False, interpolation='spline16', alpha=alpha)
-
-    finally:
-        # deleting dummy directories and moving back files to where they were
-        for file in files:
-            file_path = img_dir_path/file
-            if file_path.exists():
-                os.rename(file_path, path_img/file)
-        rmtree(train_dir_path)
+    generate_heatmaps(path, path_img, path_hms, alpha)
 
 if __name__ == '__main__':
     main()
