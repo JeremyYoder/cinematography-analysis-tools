@@ -37,34 +37,20 @@ class TestInitialise(unittest.TestCase):
         base_size = 400
         expected_box_dim = int(base_size / 4) # 100
 
-        tfms = initialise.xtra_tfms(base_size=base_size)
+        with patch('initialise.partial', wraps=partial) as mock_partial:
+            tfms = initialise.xtra_tfms(base_size=base_size)
 
-        # FastAI's partial might not be the standard functools partial.
-        # However, the previous test was attempting to patch `initialise.partial`.
-        # The correct way to test this when partial is a MagicMock is to inspect
-        # what the MagicMock for partial was called with.
+            # Check if cutout was called with the correct length
+            # cutout_ = partial(cutout, p = .8, n_holes = (1,1), length = (box_dim, box_dim))
+            # Find the call to partial that uses cutout
+            cutout_call = None
+            for call in mock_partial.call_args_list:
+                if call.args[0] == mock_fastai_vision.cutout:
+                    cutout_call = call
+                    break
 
-        # Fastai's `partial` is basically functools.partial. Since we mocked it out,
-        # let's just inspect the result.
-        # But wait, when `mock_fastai_vision.partial = functools.partial` is done,
-        # calling partial(cutout, p=...) creates a partial object.
-        # Calling that partial object calls the mocked `cutout`.
-        # However, `xtra_tfms` does `cutout_ = partial(cutout, ...)` and `cutout_()`.
-        # That means `cutout` is called WITH the arguments `length=(box_dim, box_dim)`.
-        # So we just need to look at `mock_fastai_vision.cutout.call_args_list`.
-
-        # Reset the mock to get clean call args
-        mock_fastai_vision.cutout.reset_mock()
-        tfms = initialise.xtra_tfms(base_size=base_size)
-
-        pass
-
-    @patch('initialise.cutout')
-    def test_xtra_tfms_base_size_patched(self, mock_cutout):
-        base_size = 400
-        expected_box_dim = int(base_size / 4) # 100
-        initialise.xtra_tfms(base_size=base_size)
-        mock_cutout.assert_called_with(length=(expected_box_dim, expected_box_dim), n_holes=(1, 1), p=0.8)
+            self.assertIsNotNone(cutout_call, "cutout was not used in a partial")
+            self.assertEqual(cutout_call.kwargs['length'], (expected_box_dim, expected_box_dim))
 
     def test_xtra_tfms_returns_list(self):
         tfms = initialise.xtra_tfms()

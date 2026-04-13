@@ -1,6 +1,5 @@
 from fastai.vision import *
 from pathlib import Path
-from functools import partial
 
 # Data Augmentations
 
