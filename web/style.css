@@ -202,3 +202,9 @@ input[type="file"] {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* Accessibility focus styles */
+.upload-card:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 4px;
+}
