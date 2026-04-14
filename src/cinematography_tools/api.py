@@ -50,6 +50,9 @@ async def api_predict_image(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image.")
 
+    if file.size and file.size > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 20MB.")
+
     try:
         contents = await file.read()
         img = Image.open(io.BytesIO(contents)).convert("RGB")
@@ -58,7 +61,8 @@ async def api_predict_image(file: UploadFile = File(...)):
         return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Secure error handling: do not expose raw exceptions
+        raise HTTPException(status_code=500, detail="An internal server error occurred while processing the image.")
 
 
 @app.post("/predict/colors")
@@ -66,6 +70,9 @@ async def api_extract_colors(colors: int = 5, file: UploadFile = File(...)):
     """Extract a dominant CIELAB Color Palette from an image in-memory."""
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image.")
+
+    if file.size and file.size > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 20MB.")
 
     try:
         contents = await file.read()
@@ -75,7 +82,8 @@ async def api_extract_colors(colors: int = 5, file: UploadFile = File(...)):
         return {"file": "api-upload", "palette": palette}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Secure error handling: do not expose raw exceptions
+        raise HTTPException(status_code=500, detail="An internal server error occurred while extracting the color palette.")
 
 
 def serve(host: str = "127.0.0.1", port: int = 8000):
