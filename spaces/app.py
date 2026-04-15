@@ -36,7 +36,7 @@ from cinematography_tools.charts import (
     create_distribution_bar,
     create_scope_gauge
 )
-from cinematography_tools.performance import log_performance, get_correction_factor, get_perf_summary
+from cinematography_tools.performance import log_performance, get_correction_factor, get_perf_summary, RunTimer
 
 # Pre-calculate hardware correction at startup
 HARDWARE_MULTIPLIER = get_correction_factor()
@@ -182,10 +182,12 @@ def analyze_video_ui(video_path, sample_rate, n_colors, mode_name):
         from cinematography_tools.color import extract_palette
         from cinematography_tools.timeline import build_timeline, generate_summary
 
+        timer = RunTimer()
         info = get_video_info(input_path)
-        model, _ = load_model()
 
-        start_time_perf = time.time()
+        with timer.phase("model_load"):
+            model, _ = load_model()
+
         predictions_list = []
         palettes = []
         
@@ -197,13 +199,31 @@ def analyze_video_ui(video_path, sample_rate, n_colors, mode_name):
         print(f"--- Analysis Start: {mode_name} | FPS: {sample_rate} ---")
 
         # ── Analysis Loop (Batched) ──
-        try:
-            for timestamp, frame_arr in stream_frames(input_path, sample_rate):
-                img = Image.fromarray(frame_arr)
-                current_batch.append(img)
-                current_timestamps.append(timestamp)
+        with timer.phase("extraction_and_inference"):
+            try:
+                for timestamp, frame_arr in stream_frames(input_path, sample_rate):
+                    img = Image.fromarray(frame_arr)
+                    current_batch.append(img)
+                    current_timestamps.append(timestamp)
 
-                if len(current_batch) >= batch_size:
+                    if len(current_batch) >= batch_size:
+                        results = predict_images_batch(model, current_batch)
+                        for i, res in enumerate(results):
+                            predictions_list.append({
+                                "shot_type": res["shot_type"],
+                                "confidence": res["confidence"],
+                                "timestamp": current_timestamps[i],
+                            })
+                        
+                        if current_timestamps[0] >= next_palette_time:
+                            pal = extract_palette(frame_arr, n_colors=n_colors)
+                            palettes.append({"timestamp": current_timestamps[0], "palette": pal})
+                            next_palette_time += stride_seconds
+                        
+                        current_batch = []
+                        current_timestamps = []
+
+                if current_batch:
                     results = predict_images_batch(model, current_batch)
                     for i, res in enumerate(results):
                         predictions_list.append({
@@ -211,38 +231,23 @@ def analyze_video_ui(video_path, sample_rate, n_colors, mode_name):
                             "confidence": res["confidence"],
                             "timestamp": current_timestamps[i],
                         })
-                    
-                    if current_timestamps[0] >= next_palette_time:
-                        pal = extract_palette(frame_arr, n_colors=n_colors)
-                        palettes.append({"timestamp": current_timestamps[0], "palette": pal})
-                        next_palette_time += stride_seconds
-                    
-                    current_batch = []
-                    current_timestamps = []
-
-            if current_batch:
-                results = predict_images_batch(model, current_batch)
-                for i, res in enumerate(results):
-                    predictions_list.append({
-                        "shot_type": res["shot_type"],
-                        "confidence": res["confidence"],
-                        "timestamp": current_timestamps[i],
-                    })
-        except Exception as loop_exc:
-            print(f"⚠️ Warning: Loop interrupted: {loop_exc}")
+            except Exception as loop_exc:
+                print(f"⚠️ Warning: Loop interrupted: {loop_exc}")
 
         if not predictions_list:
             return [None] * 5 + ["⚠️ No frames were analyzed."]
 
-        predictions = pd.DataFrame(predictions_list)
-        timeline = build_timeline([], predictions, sample_rate, info["duration"])
-        summary = generate_summary(timeline, output_dir / "summary.json", palettes=palettes)
+        with timer.phase("timeline_build"):
+            predictions = pd.DataFrame(predictions_list)
+            timeline = build_timeline([], predictions, sample_rate, info["duration"])
+            summary = generate_summary(timeline, output_dir / "summary.json", palettes=palettes)
         
         # ── Create Interactive Charts ──
-        fig_timeline = create_interactive_timeline(summary["rhythm"], info["duration"])
-        fig_rhythm = create_rhythm_chart(summary["rhythm"])
-        fig_dist = create_distribution_bar(summary["shot_distribution"])
-        fig_scope = create_scope_gauge(summary["cinematic_scale"]["wide_percentage"])
+        with timer.phase("chart_generation"):
+            fig_timeline = create_interactive_timeline(summary["rhythm"], info["duration"])
+            fig_rhythm = create_rhythm_chart(summary["rhythm"])
+            fig_dist = create_distribution_bar(summary["shot_distribution"])
+            fig_scope = create_scope_gauge(summary["cinematic_scale"]["wide_percentage"])
 
         # ── Color Gamut HTML ──
         gamut_html = "<div style='background: rgba(30, 41, 59, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #334155;'>"
@@ -275,12 +280,21 @@ def analyze_video_ui(video_path, sample_rate, n_colors, mode_name):
         </div>
         """
         
-        # Log performance telemetry
-        actual_time = time.time() - start_time_perf
-        # Re-calc est for the log
+        # Log structured performance telemetry
         stride = ANALYSIS_MODES[mode_name]["palette_stride"] or 5.0
         est_raw = (((len(predictions_list) / 16) * 0.11) + ((info["duration"] / stride) * 0.35) + 1.5) * HARDWARE_MULTIPLIER
-        log_performance(info["duration"], sample_rate, est_raw, actual_time, mode_name)
+        timer.finalize(
+            video_duration=info["duration"],
+            frames=len(predictions_list),
+            mode=mode_name,
+            est_time=est_raw,
+            extra={
+                "total_shots": summary["total_shots"],
+                "avg_shot_duration": summary["avg_shot_duration"],
+                "palette_count": len(palettes),
+                "fps": sample_rate,
+            }
+        )
 
         return fig_timeline, fig_rhythm, fig_dist, fig_scope, gamut_html, stats_html
 
