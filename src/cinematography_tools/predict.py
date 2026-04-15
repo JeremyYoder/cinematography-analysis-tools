@@ -45,13 +45,16 @@ def predict_image(model: torch.nn.Module, image: Path | str | Image.Image) -> Di
         logits = model(tensor)
         probs = torch.nn.functional.softmax(logits, dim=1).squeeze(0).cpu().numpy()
 
-    all_preds = [(SHOT_TYPES[i], float(probs[i]) * 100) for i in range(len(SHOT_TYPES))]
-    best = max(all_preds, key=lambda p: (p[1], -HIERARCHY_MAP.get(p[0], 999)))
+    hierarchy_vals = [-HIERARCHY_MAP.get(t, 999) for t in SHOT_TYPES]
+    best_idx = max(range(len(SHOT_TYPES)), key=lambda i: (float(probs[i]), hierarchy_vals[i]))
+
+    best_conf = float(probs[best_idx]) * 100
+    all_predictions = {SHOT_TYPES[i]: float(probs[i]) * 100 for i in range(len(SHOT_TYPES))}
 
     return {
-        "shot_type": best[0],
-        "confidence": best[1],
-        "all_predictions": {cls: conf for cls, conf in all_preds},
+        "shot_type": SHOT_TYPES[best_idx],
+        "confidence": best_conf,
+        "all_predictions": all_predictions,
         "file": file_name,
     }
 
@@ -83,13 +86,13 @@ def predict_images_batch(model: torch.nn.Module, images: List[Image.Image]) -> L
         logits = model(batch_tensor)
         probs_batch = torch.nn.functional.softmax(logits, dim=1).cpu().numpy()
 
+    hierarchy_vals = [-HIERARCHY_MAP.get(t, 999) for t in SHOT_TYPES]
     batch_results = []
     for probs in probs_batch:
-        all_preds = [(SHOT_TYPES[i], float(probs[i]) * 100) for i in range(len(SHOT_TYPES))]
-        best = max(all_preds, key=lambda p: (p[1], -HIERARCHY_MAP.get(p[0], 999)))
+        best_idx = max(range(len(SHOT_TYPES)), key=lambda i: (float(probs[i]), hierarchy_vals[i]))
         batch_results.append({
-            "shot_type": best[0],
-            "confidence": best[1],
+            "shot_type": SHOT_TYPES[best_idx],
+            "confidence": float(probs[best_idx]) * 100,
         })
 
     return batch_results
@@ -121,13 +124,27 @@ def predict_batch(
 
     print(f"Found {len(files)} images to process.")
 
+    from .transforms import get_inference_transforms
+    device = next(model.parameters()).device
+    tfms = get_inference_transforms()
+    hierarchy_vals = [-HIERARCHY_MAP.get(t, 999) for t in SHOT_TYPES]
+
     results = []
     for idx, file in enumerate(files):
         print(f"Processing image {idx + 1}/{len(files)}...")
-        result = predict_image(model, file)
+
+        img = Image.open(str(file)).convert("RGB")
+        tensor = tfms(img).unsqueeze(0).to(device)
+
+        with torch.no_grad():
+            logits = model(tensor)
+            probs = torch.nn.functional.softmax(logits, dim=1).squeeze(0).cpu().numpy()
+
+        best_idx = max(range(len(SHOT_TYPES)), key=lambda i: (float(probs[i]), hierarchy_vals[i]))
+
         results.append({
-            "shot-type": result["shot_type"],
-            "prediction": result["confidence"],
+            "shot-type": SHOT_TYPES[best_idx],
+            "prediction": float(probs[best_idx]) * 100,
             "shot": str(file.relative_to(image_dir)),
         })
 

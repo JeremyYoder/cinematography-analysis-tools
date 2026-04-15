@@ -33,49 +33,60 @@ sys.modules["get_preds"] = get_preds
 spec.loader.exec_module(get_preds)
 
 class TestGetPreds(unittest.TestCase):
-    @patch('get_preds.Path.rglob')
-    @patch('get_preds.open_image', create=True)
+    @patch('src.cinematography_tools.predict.ensure_directory')
+    @patch('src.cinematography_tools.predict.discover_images')
+    @patch('src.cinematography_tools.predict.Image.open')
     @patch('pandas.DataFrame.to_csv')
-    def test_save_preds(self, mock_to_csv, mock_open_image, mock_rglob):
+    @patch('src.cinematography_tools.transforms.get_inference_transforms')
+    def test_save_preds(self, mock_transforms, mock_to_csv, mock_open_image, mock_discover_images, mock_ensure_directory):
+        import torch
+        from src.cinematography_tools.predict import predict_batch
+
         # Setup mock dependencies
-        mock_learn = MagicMock()
-        mock_data = MagicMock()
-        mock_data.classes = ['LS', 'FS', 'MS', 'CS', 'ECS']
+        mock_model = MagicMock(spec=torch.nn.Module)
+        mock_device = MagicMock()
+        mock_model.parameters.return_value = iter([MagicMock(device=mock_device)])
 
         # Mock predictions: probabilities for each class
         mock_preds = MagicMock()
-        mock_preds.numpy.return_value = [0.1, 0.2, 0.5, 0.15, 0.05]
-        mock_learn.predict.return_value = (None, None, mock_preds)
+        # Shape matches tensor operations (batch_size, num_classes)
+        # We'll use a standard tensor simulating logits which will be softmaxed
+        # SHOT_TYPES are CS, ECS, FS, LS, MS. So MS is index 4.
+        import numpy as np
+        mock_model.return_value = torch.tensor([[0.1, 0.2, 0.15, 0.05, 5.0]])
+        mock_model.return_value = torch.tensor([[0.1, 0.2, 0.15, 0.05, 5.0]])
 
-        mock_file1 = MagicMock()
+        mock_file1 = MagicMock(spec=Path)
         mock_file1.relative_to.return_value = 'test1.jpg'
-        mock_file1.is_file.return_value = True
-        mock_file1.suffix.lower.return_value = '.jpg'
+        mock_file1.__str__.return_value = '/fake/img/path/test1.jpg'
 
-        mock_file2 = MagicMock()
+        mock_file2 = MagicMock(spec=Path)
         mock_file2.relative_to.return_value = 'test2.png'
-        mock_file2.is_file.return_value = True
-        mock_file2.suffix.lower.return_value = '.png'
+        mock_file2.__str__.return_value = '/fake/img/path/test2.png'
 
-        mock_file3 = MagicMock()
-        mock_file3.relative_to.return_value = 'test3.txt'
-        mock_file3.is_file.return_value = True
-        mock_file3.suffix.lower.return_value = '.txt'
+        mock_discover_images.return_value = [mock_file1, mock_file2]
 
-        mock_rglob.return_value = [mock_file1, mock_file2, mock_file3]
-        mock_open_image.return_value = MagicMock()
+        mock_img = MagicMock()
+        mock_open_image.return_value = mock_img
+        mock_img.convert.return_value = mock_img
 
-        # Call save_preds
+        mock_tfms = MagicMock()
+        mock_transforms.return_value = mock_tfms
+        mock_tfms.return_value = MagicMock()
+        mock_tfms.return_value.unsqueeze.return_value = MagicMock()
+        mock_tfms.return_value.unsqueeze.return_value.to.return_value = MagicMock()
+
+        # Call predict_batch
         path_img = '/fake/img/path'
-        get_preds.save_preds(mock_learn, mock_data, path_img)
+        df = predict_batch(mock_model, Path(path_img), output_path=Path(path_img) / 'preds.csv')
 
         # Verify open_image was called for the image files only
         self.assertEqual(mock_open_image.call_count, 2)
-        mock_open_image.assert_any_call(mock_file1)
-        mock_open_image.assert_any_call(mock_file2)
+        mock_open_image.assert_any_call('/fake/img/path/test1.jpg')
+        mock_open_image.assert_any_call('/fake/img/path/test2.png')
 
-        # Verify predict was called
-        self.assertEqual(mock_learn.predict.call_count, 2)
+        # Verify model was called
+        self.assertEqual(mock_model.call_count, 2)
 
         # Verify to_csv was called once to save preds.csv
         self.assertEqual(mock_to_csv.call_count, 1)
@@ -83,32 +94,47 @@ class TestGetPreds(unittest.TestCase):
         self.assertEqual(args[0], Path(path_img) / 'preds.csv')
         self.assertEqual(kwargs.get('index'), False)
 
-    @patch('get_preds.Path.mkdir')
-    @patch('get_preds.Path.rglob')
-    @patch('get_preds.open_image', create=True)
+        # Verify df content
+        self.assertEqual(len(df), 2)
+        self.assertEqual(df.iloc[0]['shot-type'], 'MS')
+
+    @patch('src.cinematography_tools.predict.ensure_directory')
+    @patch('src.cinematography_tools.predict.discover_images')
+    @patch('src.cinematography_tools.predict.Image.open')
     @patch('pandas.DataFrame.to_csv')
-    def test_save_preds_with_path_preds(self, mock_to_csv, mock_open_image, mock_rglob, mock_mkdir):
-        mock_learn = MagicMock()
-        mock_data = MagicMock()
-        mock_data.classes = ['LS', 'FS', 'MS', 'CS', 'ECS']
+    @patch('src.cinematography_tools.transforms.get_inference_transforms')
+    def test_save_preds_with_path_preds(self, mock_transforms, mock_to_csv, mock_open_image, mock_discover_images, mock_ensure_directory):
+        import torch
+        from src.cinematography_tools.predict import predict_batch
 
-        mock_preds = MagicMock()
-        mock_preds.numpy.return_value = [0.1, 0.2, 0.5, 0.15, 0.05]
-        mock_learn.predict.return_value = (None, None, mock_preds)
+        mock_model = MagicMock(spec=torch.nn.Module)
+        mock_device = MagicMock()
+        mock_model.parameters.return_value = iter([MagicMock(device=mock_device)])
 
-        mock_file1 = MagicMock()
+        mock_model.return_value = torch.tensor([[0.1, 0.2, 5.0, 0.15, 0.05]])
+
+        mock_file1 = MagicMock(spec=Path)
         mock_file1.relative_to.return_value = 'test1.jpg'
-        mock_file1.is_file.return_value = True
-        mock_file1.suffix.lower.return_value = '.jpg'
-        mock_rglob.return_value = [mock_file1]
+        mock_file1.__str__.return_value = '/fake/img/path/test1.jpg'
+        mock_discover_images.return_value = [mock_file1]
+
+        mock_img = MagicMock()
+        mock_open_image.return_value = mock_img
+        mock_img.convert.return_value = mock_img
+
+        mock_tfms = MagicMock()
+        mock_transforms.return_value = mock_tfms
+        mock_tfms.return_value = MagicMock()
+        mock_tfms.return_value.unsqueeze.return_value = MagicMock()
+        mock_tfms.return_value.unsqueeze.return_value.to.return_value = MagicMock()
 
         path_img = '/fake/img/path'
         path_preds = '/fake/preds/path'
 
-        get_preds.save_preds(mock_learn, mock_data, path_img, path_preds=path_preds)
+        predict_batch(mock_model, Path(path_img), output_path=Path(path_preds) / 'preds.csv')
 
-        # Verify mkdir was called
-        mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+        # Verify ensure_directory was called
+        mock_ensure_directory.assert_called_once_with(Path(path_preds))
 
         # Verify to_csv was called with path_preds
         self.assertEqual(mock_to_csv.call_count, 1)
