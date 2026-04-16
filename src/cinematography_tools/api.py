@@ -44,11 +44,16 @@ def read_root():
     return {"status": "online", "model_loaded": model is not None}
 
 
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit to prevent DoS
+
 @app.post("/predict/image")
 async def api_predict_image(file: UploadFile = File(...)):
     """Predict the cinematic shot type from an uploaded image in-memory."""
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image.")
+
+    if file.size is None or file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="Payload Too Large. Image must be under 10MB.")
 
     try:
         contents = await file.read()
@@ -57,8 +62,9 @@ async def api_predict_image(file: UploadFile = File(...)):
         result = predict_image(model, img)
         return result
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        # Secure error handling: Avoid exposing raw exception strings to prevent information leakage
+        raise HTTPException(status_code=500, detail="An internal server error occurred while processing the image.")
 
 
 @app.post("/predict/colors")
@@ -67,6 +73,9 @@ async def api_extract_colors(colors: int = 5, file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image.")
 
+    if file.size is None or file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="Payload Too Large. Image must be under 10MB.")
+
     try:
         contents = await file.read()
         img = Image.open(io.BytesIO(contents)).convert("RGB")
@@ -74,8 +83,9 @@ async def api_extract_colors(colors: int = 5, file: UploadFile = File(...)):
         palette = extract_palette(img, n_colors=colors)
         return {"file": "api-upload", "palette": palette}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        # Secure error handling: Avoid exposing raw exception strings to prevent information leakage
+        raise HTTPException(status_code=500, detail="An internal server error occurred while extracting colors.")
 
 
 def serve(host: str = "127.0.0.1", port: int = 8000):
