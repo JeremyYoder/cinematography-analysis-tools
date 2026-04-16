@@ -107,6 +107,13 @@ dropZone.addEventListener('drop', (e) => {
 
 dropZone.addEventListener('click', () => fileInput.click());
 
+dropZone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+    }
+});
+
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     handleFile(file);

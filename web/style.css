@@ -79,6 +79,11 @@ h1 {
     transform: translateY(-4px);
 }
 
+.upload-card:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
 .upload-card.drag-over {
     border-color: var(--accent-color);
     background: rgba(124, 77, 255, 0.1);
