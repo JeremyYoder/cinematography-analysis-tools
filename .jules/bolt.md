@@ -1,0 +1,3 @@
+## 2024-04-16 - Hoisting device logic and fast inference lookups in PyTorch
+**Learning:** PyTorch models can suffer measurable overhead when querying `next(model.parameters()).device` inside loops, taking roughly 80ms over 1000 iterations even with small transform creations. Similarly, dictionary `.get()` logic inside a `max` key function slows down CPU iteration.
+**Action:** When implementing PyTorch prediction logic over batches or directories, hoist invariant operations (e.g., `device` resolution, transform pipeline setup) outside the inference loop. In addition, replace Python dictionary `.get()` invocations inside tight loops with pre-calculated fallback arrays for fast index-based comparisons.
