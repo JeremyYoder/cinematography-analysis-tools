@@ -23,14 +23,16 @@ from . import SHOT_TYPES
 warnings.filterwarnings("ignore", ".*default behavior*")
 
 HIERARCHY_MAP = {"LS": 0, "FS": 1, "MS": 2, "CS": 3, "ECS": 4}
+PRECALCULATED_HIERARCHY = [-HIERARCHY_MAP.get(cls, 999) for cls in SHOT_TYPES]
 
 
-def predict_image(model: torch.nn.Module, image: Path | str | Image.Image) -> Dict:
+def predict_image(model: torch.nn.Module, image: Path | str | Image.Image, device: torch.device | None = None, tfms=None) -> Dict:
     """Predict the shot type of a single image using pure PyTorch."""
-    from .transforms import get_inference_transforms
-    
-    device = next(model.parameters()).device
-    tfms = get_inference_transforms()
+    if device is None:
+        device = next(model.parameters()).device
+    if tfms is None:
+        from .transforms import get_inference_transforms
+        tfms = get_inference_transforms()
     
     if isinstance(image, (Path, str)):
         img = Image.open(str(image)).convert("RGB")
@@ -46,7 +48,9 @@ def predict_image(model: torch.nn.Module, image: Path | str | Image.Image) -> Di
         probs = torch.nn.functional.softmax(logits, dim=1).squeeze(0).cpu().numpy()
 
     all_preds = [(SHOT_TYPES[i], float(probs[i]) * 100) for i in range(len(SHOT_TYPES))]
-    best = max(all_preds, key=lambda p: (p[1], -HIERARCHY_MAP.get(p[0], 999)))
+    # ⚡ Bolt: Use O(1) array lookups instead of dictionary .get() inside max() key function to eliminate PyTorch inference loop overhead
+    best_idx = max(range(len(SHOT_TYPES)), key=lambda i: (probs[i], PRECALCULATED_HIERARCHY[i]))
+    best = (SHOT_TYPES[best_idx], float(probs[best_idx]) * 100)
 
     return {
         "shot_type": best[0],
@@ -85,8 +89,9 @@ def predict_images_batch(model: torch.nn.Module, images: List[Image.Image]) -> L
 
     batch_results = []
     for probs in probs_batch:
-        all_preds = [(SHOT_TYPES[i], float(probs[i]) * 100) for i in range(len(SHOT_TYPES))]
-        best = max(all_preds, key=lambda p: (p[1], -HIERARCHY_MAP.get(p[0], 999)))
+        # ⚡ Bolt: Use O(1) array lookups instead of dictionary .get() inside max() key function to eliminate PyTorch inference loop overhead
+        best_idx = max(range(len(SHOT_TYPES)), key=lambda i: (probs[i], PRECALCULATED_HIERARCHY[i]))
+        best = (SHOT_TYPES[best_idx], float(probs[best_idx]) * 100)
         batch_results.append({
             "shot_type": best[0],
             "confidence": best[1],
@@ -121,10 +126,15 @@ def predict_batch(
 
     print(f"Found {len(files)} images to process.")
 
+    # ⚡ Bolt: Hoist invariant operations outside the processing loop
+    device = next(model.parameters()).device
+    from .transforms import get_inference_transforms
+    tfms = get_inference_transforms()
+
     results = []
     for idx, file in enumerate(files):
         print(f"Processing image {idx + 1}/{len(files)}...")
-        result = predict_image(model, file)
+        result = predict_image(model, file, device=device, tfms=tfms)
         results.append({
             "shot-type": result["shot_type"],
             "prediction": result["confidence"],
