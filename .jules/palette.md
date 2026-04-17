@@ -1,3 +1,6 @@
 ## 2025-04-10 - CLI Developer Experience
 **Learning:** For command-line tools processing multiple files (like `get-preds.py`), printing a raw dump of files (e.g. `print(files)`) creates poor Developer Experience and pollutes the console, especially with large datasets. Additionally, lacking progress indicators during long synchronous operations makes the process opaque.
 **Action:** Replace raw file list dumps with summary counts (`Found X images`), ensure empty states are handled gracefully with early returns, and use simple `enumerate` loops to print clear progress indicators (`Processing idx/total`).
+## 2024-04-17 - Custom Drop Zones Require Explicit ARIA Attributes and Keyboard Handling
+**Learning:** In this application, custom interactive elements built using `<div>` (such as the drag-and-drop file upload zone in the web UI) are completely invisible to keyboard users and screen readers by default.
+**Action:** When creating or encountering `<div>`-based drop zones, always ensure they are fully accessible by adding `role="button"`, `tabindex="0"`, a `:focus-visible` CSS outline, and explicit `keydown` event listeners for the 'Enter' and 'Space' keys to trigger the underlying file input.
