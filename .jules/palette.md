@@ -1,3 +1,6 @@
 ## 2025-04-10 - CLI Developer Experience
 **Learning:** For command-line tools processing multiple files (like `get-preds.py`), printing a raw dump of files (e.g. `print(files)`) creates poor Developer Experience and pollutes the console, especially with large datasets. Additionally, lacking progress indicators during long synchronous operations makes the process opaque.
 **Action:** Replace raw file list dumps with summary counts (`Found X images`), ensure empty states are handled gracefully with early returns, and use simple `enumerate` loops to print clear progress indicators (`Processing idx/total`).
+## 2025-04-10 - Custom Div Buttons Accessibility
+**Learning:** In the browser-native ONNX web implementation, custom UI elements like the `div`-based drag-and-drop zone (`#drop-zone`) often function as buttons for opening file pickers but completely lack native button accessibility. Specifically, they ignore keyboard navigation (Tab), lack focus states, and don't respond to `Enter`/`Space` presses.
+**Action:** Always verify custom interactive `div` elements and enhance them with `role="button"`, `tabindex="0"`, `:focus-visible` styling, and `keydown` event listeners for 'Enter' and 'Space' to make them fully accessible to keyboard and screen reader users.
