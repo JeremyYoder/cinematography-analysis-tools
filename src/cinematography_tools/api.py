@@ -32,6 +32,9 @@ app.add_middleware(
 # Global model instance
 model = None
 
+# Max file upload size (10 MB)
+MAX_FILE_SIZE = 10 * 1024 * 1024
+
 @app.on_event("startup")
 async def startup_event():
     global model
@@ -50,6 +53,9 @@ async def api_predict_image(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image.")
 
+    if file.size is None or file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB.")
+
     try:
         contents = await file.read()
         img = Image.open(io.BytesIO(contents)).convert("RGB")
@@ -58,7 +64,8 @@ async def api_predict_image(file: UploadFile = File(...)):
         return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Don't leak raw exception info
+        raise HTTPException(status_code=500, detail="Internal server error occurred while processing the image.")
 
 
 @app.post("/predict/colors")
@@ -66,6 +73,9 @@ async def api_extract_colors(colors: int = 5, file: UploadFile = File(...)):
     """Extract a dominant CIELAB Color Palette from an image in-memory."""
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image.")
+
+    if file.size is None or file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB.")
 
     try:
         contents = await file.read()
@@ -75,7 +85,8 @@ async def api_extract_colors(colors: int = 5, file: UploadFile = File(...)):
         return {"file": "api-upload", "palette": palette}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Don't leak raw exception info
+        raise HTTPException(status_code=500, detail="Internal server error occurred while extracting colors.")
 
 
 def serve(host: str = "127.0.0.1", port: int = 8000):
